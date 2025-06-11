@@ -23,7 +23,7 @@ export default function TravelPlanTest() {
     };
 
     try {
-      const response = await fetch('/api/travel-plan', {
+      const response = await fetch('/api/travel-plan-openai', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
