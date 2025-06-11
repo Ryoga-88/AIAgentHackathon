@@ -10,7 +10,12 @@ export function DynamicTravelPage() {
 
   return (
     <ThemeProvider themeName={scheduleData.theme}>
-      <div className="min-h-screen bg-gradient-to-br from-[var(--background-color)] to-[var(--surface-color)]">
+      <div 
+        className="min-h-screen"
+        style={{ 
+          background: 'var(--gradient-card)'
+        }}
+      >
         <div className="max-w-7xl mx-auto">
           <TravelHero data={scheduleData.hero} />
           

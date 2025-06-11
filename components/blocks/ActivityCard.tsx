@@ -24,7 +24,7 @@ export function ActivityCard({ activity, isLast }) {
 
   const formatTime = (timeString) => {
     const [start, end] = timeString.split(' - ');
-    if (!end) return { display: start, duration: null };
+    if (!end) return { display: start, duration: undefined };
     
     const startHour = parseInt(start.split(':')[0]);
     const endHour = parseInt(end.split(':')[0]);
@@ -89,43 +89,24 @@ export function ActivityCard({ activity, isLast }) {
       {/* メインカード */}
       <div className="ml-24 mb-12">
         <div 
-          className="relative rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-700 overflow-hidden group-hover:-translate-y-2 group-hover:rotate-1"
+          className="relative rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-700 overflow-hidden"
           style={{ 
             background: theme.gradients.card,
             borderLeft: `6px solid ${activityStyle.accent}`,
             boxShadow: 'var(--shadow-md)',
-            transform: 'perspective(1000px)'
           }}
         >
-          {/* プレミアム画像セクション */}
+          {/* 画像セクション */}
           <div className="relative h-80 overflow-hidden">
-            {/* ローディングプレースホルダー */}
-            {!imageLoaded && !imageError && (
-              <div 
-                className="absolute inset-0 animate-pulse flex items-center justify-center"
-                style={{ 
-                  background: 'linear-gradient(135deg, var(--neutral-200), var(--neutral-100))' 
-                }}
-              >
-                <div 
-                  className="w-16 h-16 border-4 border-t-transparent rounded-full animate-spin"
-                  style={{ borderColor: 'var(--neutral-500)' }}
-                />
-              </div>
-            )}
-            
-            {/* メイン画像 */}
             <img 
               src={activity.image}
               alt={activity.title}
-              className={`w-full h-full object-cover transition-all duration-1000 ${
-                imageLoaded ? 'scale-100 opacity-100' : 'scale-110 opacity-0'
-              } group-hover:scale-105`}
+              className="w-full h-full object-cover"
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageError(true)}
             />
             
-            {/* 動的グラデーションオーバーレイ */}
+            {/* オーバーレイ */}
             <div 
               className="absolute inset-0 opacity-60"
               style={{ background: activityStyle.gradient }}
@@ -147,16 +128,6 @@ export function ActivityCard({ activity, isLast }) {
                 >
                   {activity.rating}
                 </span>
-              </div>
-            </div>
-            
-            {/* 優先度ラベル */}
-            <div className="absolute bottom-6 left-6">
-              <div 
-                className="bg-black/70 backdrop-blur-sm rounded-xl px-4 py-2 border-l-4"
-                style={{ borderLeftColor: activityStyle.accent }}
-              >
-                <span className="text-white font-bold text-sm">{priorityInfo.label}</span>
               </div>
             </div>
           </div>
@@ -185,7 +156,7 @@ export function ActivityCard({ activity, isLast }) {
               </p>
             </div>
 
-            {/* プレミアム情報グリッド */}
+            {/* 情報グリッド */}
             <div className="grid grid-cols-1 gap-4 mb-8">
               {/* 時間情報 */}
               <div 
@@ -296,7 +267,7 @@ export function ActivityCard({ activity, isLast }) {
               </p>
             </div>
 
-            {/* プレミアムTips */}
+            {/* Tips */}
             {activity.tips && (
               <div 
                 className="relative p-6 rounded-2xl border-2 border-dashed"

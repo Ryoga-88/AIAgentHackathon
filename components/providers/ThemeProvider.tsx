@@ -1,27 +1,39 @@
 'use client';
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { getTheme } from '@/utils/themeDefinitions';
+import { ThemeDefinition, ThemeContextValue, ActivityStyle } from '@/types/theme';
 
-const ThemeContext = createContext();
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-export function ThemeProvider({ themeName, children }) {
-  const theme = getTheme(themeName);
+interface ThemeProviderProps {
+  themeName: string;
+  children: ReactNode;
+}
 
-  const getActivityStyle = (activityType) => {
+export function ThemeProvider({ themeName, children }: ThemeProviderProps) {
+  const theme: ThemeDefinition = getTheme(themeName);
+
+  const getActivityStyle = (activityType: string): ActivityStyle => {
     return theme.activity_styles[activityType] || theme.activity_styles.heritage;
   };
 
   // 新しい色構造に対応したヘルパー関数
-  const getColor = (colorType, shade = 500) => {
-    const colorPalette = theme.palette[colorType];
+  const getColor = (colorType: string, shade: number = 500): string => {
+    const colorPalette = theme.palette[colorType as keyof typeof theme.palette];
     if (typeof colorPalette === 'object') {
-      return colorPalette[shade] || colorPalette[500];
+      return colorPalette[shade as keyof typeof colorPalette] || colorPalette[500];
     }
-    return colorPalette;
+    return colorPalette as string;
+  };
+
+  const contextValue: ThemeContextValue = {
+    theme,
+    getActivityStyle,
+    getColor
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, getActivityStyle, getColor }}>
+    <ThemeContext.Provider value={contextValue}>
       <div 
         style={{
           '--primary-50': getColor('primary', 50),
@@ -58,12 +70,7 @@ export function ThemeProvider({ themeName, children }) {
           '--heading-font': theme.typography.heading,
           '--body-font': theme.typography.body,
           '--accent-font': theme.typography.accent,
-          // 修正: border_radiusの構造に対応
-          '--border-radius-sm': theme.effects?.border_radius?.sm || '8px',
-          '--border-radius-md': theme.effects?.border_radius?.md || '12px',
-          '--border-radius-lg': theme.effects?.border_radius?.lg || '16px',
-          '--border-radius-xl': theme.effects?.border_radius?.xl || '24px'
-        }}
+        } as React.CSSProperties}
         className="theme-container"
       >
         {children}
@@ -72,4 +79,10 @@ export function ThemeProvider({ themeName, children }) {
   );
 }
 
-export const useTheme = () => useContext(ThemeContext);
+export const useTheme = (): ThemeContextValue => {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};

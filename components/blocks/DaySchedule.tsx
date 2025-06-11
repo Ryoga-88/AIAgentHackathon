@@ -18,7 +18,7 @@ export function DaySchedule({ data }) {
               className="w-full h-full object-cover"
             />
             
-            {/* オーバーレイ - 新しいグラデーション使用 */}
+            {/* オーバーレイ */}
             <div 
               className="absolute inset-0"
               style={{ background: theme.gradients.secondary }}
