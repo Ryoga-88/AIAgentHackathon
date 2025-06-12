@@ -13,96 +13,65 @@ export default function PlansPage() {
   const { currentUser, loading: authLoading } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null);
-  const [regeneratingActivity, setRegeneratingActivity] = useState(null);
-  const [regenerateComment, setRegenerateComment] = useState('');
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hotels, setHotels] = useState({});
   const [locationData, setLocationData] = useState({});
   const [activityImages, setActivityImages] = useState({});
+  const [heroImages, setHeroImages] = useState({});
+  const [dayImages, setDayImages] = useState({});
   const [routeData, setRouteData] = useState({});
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [hasStoredPlans, setHasStoredPlans] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [showRegenerateForm, setShowRegenerateForm] = useState(false);
+  const [additionalPrompt, setAdditionalPrompt] = useState('');
 
-  // プランデータの存在確認
+  // クライアントサイドレンダリングの確認とプランデータの存在確認
   useEffect(() => {
+    setIsClient(true);
     const storedPlans = localStorage.getItem('travelPlans');
-    console.log('🔍 プランデータ存在確認:', storedPlans ? 'データ有り' : 'データ無し');
     
-    // プランデータがない場合はホームページにリダイレクト（認証状態に関係なく）
-    if (!storedPlans) {
-      console.log('⚠️ プランデータなし、ホームページにリダイレクト');
+    if (storedPlans) {
+      setHasStoredPlans(true);
+    } else {
+      // プランデータがない場合はホームページにリダイレクト
       router.push('/');
       return;
     }
-  }, [router]); // 認証状態を依存から除外
-
-  // プランデータがない場合のローディング表示
-  const storedPlans = typeof window !== 'undefined' ? localStorage.getItem('travelPlans') : null;
-  
-  // 認証のローディング中でもプランデータがある場合は表示を続ける
-  if (authLoading && !storedPlans) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 mb-4">認証状態を確認中...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!storedPlans && !loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🗺️</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">プランが見つかりません</h3>
-          <p className="text-gray-600 mb-4">まずはプランを作成してください</p>
-          <button
-            onClick={() => router.push('/')}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-          >
-            プランを作成する
-          </button>
-        </div>
-      </div>
-    );
-  }
+  }, [router]);
 
   // LLMの出力データまたはローカルストレージからプランを取得
   useEffect(() => {
+    if (!isClient || !hasStoredPlans) return; // クライアント側でプランデータがある場合のみ実行
+    
     const fetchPlans = async () => {
       if (loading) { // 既にローディング中の場合は実行しない
         try {
           // まずローカルストレージから最新のプランを確認
           const storedPlans = localStorage.getItem('travelPlans');
-          console.log('🔍 LocalStorage data:', storedPlans ? 'データ有り' : 'データ無し'); // デバッグ用
-          console.log('👤 Current user:', currentUser ? 'ログイン済み' : '未ログイン'); // デバッグ用
-          console.log('⏳ Auth loading:', authLoading); // デバッグ用
           
           if (storedPlans) {
             const parsedPlans = JSON.parse(storedPlans);
-            console.log('📊 Parsed plans:', parsedPlans); // デバッグ用
             
             if (parsedPlans.plans && Array.isArray(parsedPlans.plans)) {
-              console.log('✅ Using LLM plans (multiple):', parsedPlans.plans.length); // デバッグ用
               setPlans(parsedPlans.plans);
             } else if (Array.isArray(parsedPlans)) {
-              console.log('✅ Using LLM plans (array):', parsedPlans.length); // デバッグ用
               setPlans(parsedPlans);
             } else {
               // 単一プランの場合は配列に変換
-              console.log('✅ Using LLM plans (single)'); // デバッグ用
               setPlans([parsedPlans]);
             }
           } else {
             // ローカルストレージにデータがない場合はMockデータを使用
-            console.log('🎭 Using mock data'); // デバッグ用
             const mockPlans = getMockPlans();
             setPlans(mockPlans);
           }
         } catch (error) {
-          console.error('❌ プランの取得に失敗:', error);
+          console.error('プランの取得に失敗:', error);
           // エラー時はMockデータを使用
           const mockPlans = getMockPlans();
           setPlans(mockPlans);
@@ -113,23 +82,21 @@ export default function PlansPage() {
     };
 
     fetchPlans();
-  }, []); // 依存配列を空にして、最初の1回のみ実行
-
-  // 認証状態が変わった時の追加ログ
-  useEffect(() => {
-    console.log('🔄 認証状態が変化:', {
-      currentUser: currentUser ? 'ログイン済み' : '未ログイン',
-      authLoading,
-      plansCount: plans.length
-    });
-  }, [currentUser, authLoading, plans.length]);
+  }, [isClient, hasStoredPlans, loading]); // 依存配列を適切に設定
 
   // 位置情報とホテル情報を取得
   useEffect(() => {
-    if (plans.length === 0) return;
+    if (plans.length === 0 || !isClient) return;
 
     const fetchData = async () => {
       try {
+        // plansが有効であることを確認
+        if (!plans || !Array.isArray(plans) || plans.length === 0) {
+          console.warn('プランデータが無効です:', plans);
+          setLoading(false);
+          return;
+        }
+
         const mockPlans = plans;
         
         // 全プランから位置情報を抽出
@@ -141,56 +108,203 @@ export default function PlansPage() {
 
         // 位置情報を一括取得
         const locationsArray = Array.from(allLocations);
-        const locationResults = await getMultipleLocationsData(locationsArray);
-        setLocationData(locationResults);
+        console.log('取得する位置情報:', locationsArray);
+        
+        let locationResults = {};
+        try {
+          locationResults = await getMultipleLocationsData(locationsArray);
+          console.log('位置情報取得結果:', locationResults);
+          setLocationData(locationResults);
+        } catch (error) {
+          console.error('位置情報取得に失敗:', error);
+          // エラーが発生してもアプリケーションを継続
+          setLocationData({});
+        }
 
         // 各プランの主要都市でホテルを並行検索（パフォーマンス改善）
-        const hotelPromises = plans.map(async (plan) => {
+        const hotelPromises = plans.filter(plan => plan && plan.hero && plan.hero.title).map(async (plan) => {
           const mainDestination = plan.hero.title;
-          if (locationResults[mainDestination] && locationResults[mainDestination].coordinates) {
+          const locationData = locationResults[mainDestination];
+          
+          // 日程の設定（今日から1週間後〜3日間の滞在）
+          const today = new Date();
+          const checkin = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000); // 1週間後
+          const checkout = new Date(checkin.getTime() + 3 * 24 * 60 * 60 * 1000); // 3日間の滞在
+          
+          const checkinStr = checkin.toISOString().split('T')[0];
+          const checkoutStr = checkout.toISOString().split('T')[0];
+          
+          if (locationData && locationData.coordinates) {
             try {
+              console.log(`ホテル検索中: ${mainDestination}`, {
+                coordinates: locationData.coordinates,
+                checkin: checkinStr,
+                checkout: checkoutStr
+              });
+              
               const hotelResponse = await fetch('/api/search-hotels', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                  checkin: '2025-12-01',
-                  checkout: '2025-12-03',
+                  checkin: checkinStr,
+                  checkout: checkoutStr,
                   adults: 2,
                   searchType: 'coordinates',
-                  coordinates: locationResults[mainDestination].coordinates
+                  coordinates: locationData.coordinates
                 }),
               });
 
               if (hotelResponse.ok) {
                 const hotelData = await hotelResponse.json();
+                console.log(`ホテル検索成功 (${mainDestination}):`, hotelData);
                 return { trip_id: plan.trip_id, results: hotelData.results };
+              } else {
+                console.error(`ホテル検索失敗 (${mainDestination}):`, hotelResponse.status);
               }
             } catch (error) {
               console.error(`ホテル検索エラー (${plan.trip_id}):`, error);
+            }
+          } else {
+            // 座標がない場合は地名で検索
+            try {
+              console.log(`ホテル検索（地名）: ${mainDestination}`);
+              const hotelResponse = await fetch('/api/search-hotels', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  checkin: checkinStr,
+                  checkout: checkoutStr,
+                  adults: 2,
+                  searchType: 'location',
+                  location: mainDestination
+                }),
+              });
+
+              if (hotelResponse.ok) {
+                const hotelData = await hotelResponse.json();
+                console.log(`ホテル検索成功（地名）(${mainDestination}):`, hotelData);
+                return { trip_id: plan.trip_id, results: hotelData.results };
+              }
+            } catch (error) {
+              console.error(`ホテル検索エラー（地名）(${plan.trip_id}):`, error);
             }
           }
           return { trip_id: plan.trip_id, results: [] };
         });
 
-        const hotelResults = {};
-        const hotelResponses = await Promise.all(hotelPromises);
-        hotelResponses.forEach(response => {
-          hotelResults[response.trip_id] = response.results;
-        });
+        // ホテル情報を設定
+        try {
+          const hotelResults = {};
+          const hotelResponses = await Promise.all(hotelPromises);
+          hotelResponses.forEach(response => {
+            hotelResults[response.trip_id] = response.results;
+          });
+          console.log('ホテル検索結果:', hotelResults);
+          setHotels(hotelResults);
+        } catch (error) {
+          console.error('ホテル情報取得に失敗:', error);
+          // エラーが発生してもアプリケーションを継続
+          setHotels({});
+        }
+
+        // プランのヒーロー画像を並行取得
+        const heroImagePromises = [];
+        const heroImageResults = {};
         
-        setHotels(hotelResults);
+        for (const plan of plans.filter(p => p && p.hero && p.hero.title)) {
+          console.log(`ヒーロー画像取得開始: ${plan.hero.title} (Trip: ${plan.trip_id})`);
+          
+          const promise = fetch('/api/places-photos', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              placeName: plan.hero.title
+            }),
+          })
+          .then(async (response) => {
+            console.log(`ヒーロー画像レスポンス (${plan.hero.title}):`, response.status);
+            if (response.ok) {
+              const imageData = await response.json();
+              console.log(`ヒーロー画像取得成功 (${plan.hero.title}):`, imageData);
+              return { 
+                trip_id: plan.trip_id, 
+                data: imageData 
+              };
+            } else {
+              const errorData = await response.json().catch(() => ({ error: '不明なエラー' }));
+              console.warn(`ヒーロー画像取得失敗 (${plan.hero.title}):`, response.status, errorData);
+            }
+            return null;
+          })
+          .catch((error) => {
+            console.error(`ヒーロー画像取得エラー (${plan.hero.title}):`, error);
+            return null;
+          });
+          
+          heroImagePromises.push(promise);
+        }
+
+        // 各日のヘッダー画像を並行取得
+        const dayImagePromises = [];
+        const dayImageResults = {};
+        
+        for (const plan of plans.filter(p => p && p.itinerary && Array.isArray(p.itinerary))) {
+          dayImageResults[plan.trip_id] = {};
+          
+          for (const day of plan.itinerary.filter(d => d && d.city && d.city.name)) {
+            console.log(`日程画像取得開始: ${day.city.name} (Trip: ${plan.trip_id}, Day: ${day.day})`);
+            
+            const promise = fetch('/api/places-photos', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                placeName: day.city.name
+              }),
+            })
+            .then(async (response) => {
+              console.log(`日程画像レスポンス (${day.city.name}):`, response.status);
+              if (response.ok) {
+                const imageData = await response.json();
+                console.log(`日程画像取得成功 (${day.city.name}):`, imageData);
+                return { 
+                  trip_id: plan.trip_id, 
+                  day: day.day,
+                  data: imageData 
+                };
+              } else {
+                const errorData = await response.json().catch(() => ({ error: '不明なエラー' }));
+                console.warn(`日程画像取得失敗 (${day.city.name}):`, response.status, errorData);
+              }
+              return null;
+            })
+            .catch((error) => {
+              console.error(`日程画像取得エラー (${day.city.name}):`, error);
+              return null;
+            });
+            
+            dayImagePromises.push(promise);
+          }
+        }
 
         // アクティビティの画像を並行取得（パフォーマンス改善）
         const activityImagePromises = [];
         const activityImageResults = {};
         
-        for (const plan of plans) {
+        for (const plan of plans.filter(p => p && p.itinerary && Array.isArray(p.itinerary))) {
           activityImageResults[plan.trip_id] = {};
           
-          for (const day of plan.itinerary || []) {
-            for (const activity of day.activities || []) {
+          for (const day of plan.itinerary.filter(d => d && d.activities && Array.isArray(d.activities))) {
+            for (const activity of day.activities.filter(a => a && a.title && a.id)) {
+              console.log(`画像取得開始: ${activity.title} (Trip: ${plan.trip_id}, Activity: ${activity.id})`);
+              
               const promise = fetch('/api/places-photos', {
                 method: 'POST',
                 headers: {
@@ -201,13 +315,18 @@ export default function PlansPage() {
                 }),
               })
               .then(async (response) => {
+                console.log(`画像取得レスポンス (${activity.title}):`, response.status, response.statusText);
                 if (response.ok) {
                   const imageData = await response.json();
+                  console.log(`画像取得成功 (${activity.title}):`, imageData);
                   return { 
                     trip_id: plan.trip_id, 
                     activity_id: activity.id, 
                     data: imageData 
                   };
+                } else {
+                  const errorData = await response.json().catch(() => ({ error: '不明なエラー' }));
+                  console.warn(`画像取得失敗 (${activity.title}):`, response.status, errorData);
                 }
                 return null;
               })
@@ -221,14 +340,51 @@ export default function PlansPage() {
           }
         }
 
-        const activityImageResponses = await Promise.all(activityImagePromises);
-        activityImageResponses.forEach(response => {
-          if (response) {
-            activityImageResults[response.trip_id][response.activity_id] = response.data;
-          }
-        });
+        // ヒーロー画像を設定
+        try {
+          const heroImageResponses = await Promise.all(heroImagePromises);
+          heroImageResponses.forEach(response => {
+            if (response) {
+              heroImageResults[response.trip_id] = response.data;
+            }
+          });
+          console.log('ヒーロー画像取得結果:', heroImageResults);
+          setHeroImages(heroImageResults);
+        } catch (error) {
+          console.error('ヒーロー画像取得に失敗:', error);
+          setHeroImages({});
+        }
 
-        setActivityImages(activityImageResults);
+        // 日程画像を設定
+        try {
+          const dayImageResponses = await Promise.all(dayImagePromises);
+          dayImageResponses.forEach(response => {
+            if (response) {
+              dayImageResults[response.trip_id][response.day] = response.data;
+            }
+          });
+          console.log('日程画像取得結果:', dayImageResults);
+          setDayImages(dayImageResults);
+        } catch (error) {
+          console.error('日程画像取得に失敗:', error);
+          setDayImages({});
+        }
+
+        // アクティビティ画像を設定
+        try {
+          const activityImageResponses = await Promise.all(activityImagePromises);
+          activityImageResponses.forEach(response => {
+            if (response) {
+              activityImageResults[response.trip_id][response.activity_id] = response.data;
+            }
+          });
+          console.log('アクティビティ画像取得結果:', activityImageResults);
+          setActivityImages(activityImageResults);
+        } catch (error) {
+          console.error('アクティビティ画像取得に失敗:', error);
+          // エラーが発生してもアプリケーションを継続
+          setActivityImages({});
+        }
 
         // 各プランの経路情報を並行取得（パフォーマンス改善）
         const routePromises = [];
@@ -279,6 +435,7 @@ export default function PlansPage() {
             }
 
             if (dailyWaypoints.length >= 2) {
+              console.log(`Day ${day.day} ルート取得中 (${plan.trip_id}):`, dailyWaypoints);
               const dailyPromise = fetch('/api/directions', {
                 method: 'POST',
                 headers: {
@@ -289,8 +446,10 @@ export default function PlansPage() {
               .then(async (response) => {
                 if (response.ok) {
                   const routeData = await response.json();
+                  console.log(`Day ${day.day} ルート取得成功 (${plan.trip_id}):`, routeData);
                   return { trip_id: plan.trip_id, type: `day_${day.day}`, data: routeData };
                 }
+                console.error(`Day ${day.day} ルート取得失敗 (${plan.trip_id}):`, response.status);
                 return null;
               })
               .catch((error) => {
@@ -303,14 +462,21 @@ export default function PlansPage() {
           }
         }
 
-        const routeResponses = await Promise.all(routePromises);
-        routeResponses.forEach(response => {
-          if (response) {
-            routeResults[response.trip_id][response.type] = response.data;
-          }
-        });
-
-        setRouteData(routeResults);
+        // 経路情報を設定
+        try {
+          const routeResponses = await Promise.all(routePromises);
+          routeResponses.forEach(response => {
+            if (response) {
+              routeResults[response.trip_id][response.type] = response.data;
+            }
+          });
+          console.log('ルート取得結果:', routeResults);
+          setRouteData(routeResults);
+        } catch (error) {
+          console.error('ルート情報取得に失敗:', error);
+          // エラーが発生してもアプリケーションを継続
+          setRouteData({});
+        }
         setLoading(false);
       } catch (error) {
         console.error('データ取得エラー:', error);
@@ -324,17 +490,94 @@ export default function PlansPage() {
   const handlePlanSelect = (planIndex) => {
     setSelectedPlan(planIndex);
     setExpandedDay(null);
-    setRegeneratingActivity(null);
   };
 
   const handleConfirmPlan = () => {
+    if (startDate && endDate) {
+      // 日程が設定されている場合、その情報を含めて確定画面に遷移
+      const planWithDates = {
+        ...selectedPlanData,
+        travel_dates: {
+          start: startDate,
+          end: endDate
+        }
+      };
+      localStorage.setItem('selectedPlanWithDates', JSON.stringify(planWithDates));
+    }
     router.push('/confirm');
+  };
+
+  const handleDateConfirm = () => {
+    if (!startDate || !endDate) {
+      alert('出発日と帰着日を両方選択してください。');
+      return;
+    }
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (start >= end) {
+      alert('帰着日は出発日より後の日付を選択してください。');
+      return;
+    }
+    
+    // 日程の差を計算
+    const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    const planDuration = selectedPlanData?.hero?.duration || '';
+    const expectedDays = parseInt(planDuration.match(/\d+/)?.[0]) || 0;
+    
+    if (daysDiff !== expectedDays && expectedDays > 0) {
+      if (!confirm(`プランは${expectedDays}日間ですが、選択された期間は${daysDiff}日間です。このまま続行しますか？`)) {
+        return;
+      }
+    }
+    
+    setShowDatePicker(false);
+    alert(`旅行日程が設定されました: ${startDate} 〜 ${endDate}`);
   };
 
   const handleRegenerate = () => {
     if (confirm('新しいプランを生成しますか？')) {
       router.push('/');
     }
+  };
+
+  const handleRegenerateWithPrompt = async () => {
+    if (!additionalPrompt.trim()) {
+      alert('追加の要望を入力してください。');
+      return;
+    }
+
+    try {
+      // 現在のプランデータと追加プロンプトを組み合わせて新しいプランを生成
+      const response = await fetch('/api/modify-travel-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          original_plan: selectedPlanData,
+          plan_number: selectedPlan + 1,
+          modification_request: additionalPrompt,
+          full_plans_data: plans
+        }),
+      });
+
+      if (response.ok) {
+        const newPlans = await response.json();
+        localStorage.setItem('travelPlans', JSON.stringify(newPlans));
+        // ページをリロードして新しいプランを表示
+        window.location.reload();
+      } else {
+        alert('プランの生成に失敗しました。もう一度お試しください。');
+      }
+    } catch (error) {
+      console.error('プラン再生成エラー:', error);
+      alert('プランの生成中にエラーが発生しました。');
+    }
+
+    setShowRegenerateForm(false);
+    setAdditionalPrompt('');
   };
 
   if (loading) {
@@ -349,23 +592,25 @@ export default function PlansPage() {
     );
   }
 
-  const handleRegenerateActivity = (dayIndex, activityIndex) => {
-    setRegeneratingActivity(`${dayIndex}-${activityIndex}`);
-    setRegenerateComment('');
-  };
-
-  const handleSubmitRegenerate = () => {
-    // 実際の再生成処理をここに実装
-    console.log('観光名所を再生成:', regenerateComment);
-    setRegeneratingActivity(null);
-    setRegenerateComment('');
-  };
-
   const handleBookingClick = (type) => {
     console.log(`${type}の予約を開始`);
   };
 
   const selectedPlanData = selectedPlan !== null ? plans[selectedPlan] : null;
+
+  // SSR中またはプランデータがない場合のローディング表示
+  if (!isClient || authLoading || !hasStoredPlans) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 mb-4">
+            {!isClient ? "読み込み中..." : authLoading ? "認証状態を確認中..." : "プランデータを確認中..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -412,86 +657,68 @@ export default function PlansPage() {
           </div>
         )}
 
-        {/* Debug Info - 開発時のみ表示 */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <h3 className="text-sm font-medium text-yellow-800 mb-2">🔧 デバッグ情報</h3>
-            <div className="text-xs text-yellow-700">
-              <p>プラン数: {plans.length}</p>
-              <p>認証状態: {currentUser ? 'ログイン済み' : '未ログイン'}</p>
-              <p>認証ローディング: {authLoading ? '読み込み中' : '完了'}</p>
-              <p>データソース: {plans.length > 0 && plans[0].trip_id?.includes('mock') ? 'Mock データ' : 'LLM データ'}</p>
-              <p>LocalStorage: {typeof window !== 'undefined' && localStorage.getItem('travelPlans') ? '有り' : '無し'}</p>
-              <p>選択されたプラン: {selectedPlan !== null ? `プラン ${selectedPlan + 1}` : 'なし'}</p>
-              {currentUser && (
-                <p>ユーザー: {currentUser.displayName || currentUser.email}</p>
-              )}
-              <button 
-                onClick={() => {
-                  localStorage.removeItem('travelPlans');
-                  window.location.reload();
-                }}
-                className="mt-2 px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-              >
-                LocalStorageクリア & リロード
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Plan Selection Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {plans.map((plan, index) => (
-            <div
-              key={plan.trip_id}
-              className={`bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transform transition-all duration-200 hover:scale-105 ${
-                selectedPlan === index ? 'ring-4 ring-blue-500 ring-opacity-50' : 'hover:shadow-xl'
-              }`}
-              onClick={() => handlePlanSelect(index)}
-            >
+          {plans && plans.length > 0 ? (
+            plans.filter(plan => plan && plan.hero).map((plan, index) => (
+              <div
+                key={plan.trip_id || index}
+                className={`bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transform transition-all duration-200 hover:scale-105 ${
+                  selectedPlan === index ? 'ring-4 ring-blue-500 ring-opacity-50' : 'hover:shadow-xl'
+                }`}
+                onClick={() => handlePlanSelect(index)}
+              >
               <div className="relative h-48">
-                <img
-                  src={plan.hero.hero_image}
-                  alt={plan.hero.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                <div className="absolute bottom-0 left-0 right-0 p-4">
-                  <h3 className="text-xl font-bold text-white mb-1">{plan.hero.title}</h3>
-                  <p className="text-gray-200 text-sm">{plan.hero.subtitle}</p>
-                </div>
-              </div>
-              
-              <div className="p-4">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-blue-600 font-semibold">{plan.hero.duration}</span>
-                  <span className="text-purple-600 font-semibold">{plan.hero.budget}</span>
+                  <img
+                    src={heroImages[plan.trip_id]?.photo_url || plan.hero?.hero_image || 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&h=600&fit=crop'}
+                    alt={plan.hero?.title || 'プラン画像'}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.src = plan.hero?.hero_image || 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&h=600&fit=crop';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                  <div className="absolute bottom-0 left-0 right-0 p-4">
+                    <h3 className="text-xl font-bold text-white mb-1">{plan.hero?.title || 'プラン名未設定'}</h3>
+                    <p className="text-gray-200 text-sm">{plan.hero?.subtitle || ''}</p>
+                  </div>
                 </div>
                 
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {plan.hero.highlights.slice(0, 2).map((highlight, idx) => (
-                    <span key={idx} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full">
-                      {highlight}
-                    </span>
-                  ))}
-                  {plan.hero.highlights.length > 2 && (
-                    <span className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full">
-                      +{plan.hero.highlights.length - 2}
-                    </span>
-                  )}
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">📍 {plan.hero.destination}</span>
-                  {selectedPlan === index && (
-                    <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-medium">
-                      選択中
-                    </span>
-                  )}
+                <div className="p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-blue-600 font-semibold">{plan.hero?.duration || '期間未設定'}</span>
+                    <span className="text-purple-600 font-semibold">{plan.hero?.budget || '予算未設定'}</span>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {(plan.hero?.highlights || []).slice(0, 2).map((highlight, idx) => (
+                      <span key={idx} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full">
+                        {highlight}
+                      </span>
+                    ))}
+                    {(plan.hero?.highlights || []).length > 2 && (
+                      <span className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full">
+                        +{(plan.hero?.highlights || []).length - 2}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">📍 {plan.hero?.destination || '目的地未設定'}</span>
+                    {selectedPlan === index && (
+                      <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-medium">
+                        選択中
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="col-span-3 text-center py-8">
+              <p className="text-gray-500">プランデータを読み込み中...</p>
             </div>
-          ))}
+          )}
         </div>
 
         {/* Selected Plan Details */}
@@ -507,9 +734,12 @@ export default function PlansPage() {
                     {/* Day Header */}
                     <div className="relative h-32 sm:h-40">
                       <img
-                        src={day.city.image}
+                        src={dayImages[selectedPlanData.trip_id]?.[day.day]?.photo_url || day.city.image}
                         alt={day.city.name}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src = day.city.image; // フォールバック
+                        }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent"></div>
                       <div className="absolute bottom-0 left-0 right-0 p-6">
@@ -526,9 +756,12 @@ export default function PlansPage() {
                             <div className="flex flex-col sm:flex-row gap-6">
                               <div className="sm:w-48 flex-shrink-0">
                                 <img
-                                  src={activity.image}
+                                  src={activityImages[selectedPlanData.trip_id]?.[activity.id]?.photo_url || activity.image}
                                   alt={activity.title}
                                   className="w-full h-32 sm:h-36 object-cover rounded-lg"
+                                  onError={(e) => {
+                                    e.target.src = activity.image; // フォールバック
+                                  }}
                                 />
                               </div>
                               
@@ -550,14 +783,6 @@ export default function PlansPage() {
                                     </div>
                                     <h4 className="text-xl font-bold text-gray-900 mb-1">{activity.title}</h4>
                                     <p className="text-gray-600 font-medium mb-2">{activity.subtitle}</p>
-                                  </div>
-                                  <div className="ml-4">
-                                    <button
-                                      onClick={() => handleRegenerateActivity(dayIndex, activityIndex)}
-                                      className="text-green-600 hover:text-green-800 text-sm font-medium"
-                                    >
-                                      再生成
-                                    </button>
                                   </div>
                                 </div>
                                 
@@ -584,40 +809,6 @@ export default function PlansPage() {
                                       <span className="font-medium">💡 Tip: </span>
                                       {activity.tips}
                                     </p>
-                                  </div>
-                                )}
-
-                                {/* Regenerate Form */}
-                                {regeneratingActivity === `${dayIndex}-${activityIndex}` && (
-                                  <div className="mt-4 p-4 bg-green-50 rounded-lg">
-                                    <h5 className="font-medium text-gray-900 mb-3">観光名所を再生成</h5>
-                                    <div className="space-y-3">
-                                      <div className="text-sm text-gray-700 mb-2">
-                                        現在の観光名所: <strong>{activity.title}</strong>
-                                      </div>
-                                      <textarea
-                                        value={regenerateComment}
-                                        onChange={(e) => setRegenerateComment(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                        rows="3"
-                                        placeholder="どのような観光名所をお望みですか？（例：もっと歴史的な場所、子供向けの施設、静かな場所など）"
-                                      />
-                                      <div className="flex space-x-2">
-                                        <button
-                                          onClick={handleSubmitRegenerate}
-                                          disabled={!regenerateComment.trim()}
-                                          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                        >
-                                          再生成実行
-                                        </button>
-                                        <button
-                                          onClick={() => setRegeneratingActivity(null)}
-                                          className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-400 transition-colors"
-                                        >
-                                          キャンセル
-                                        </button>
-                                      </div>
-                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -799,60 +990,6 @@ export default function PlansPage() {
             {/* Sidebar */}
             <div className="lg:col-span-1 mt-8 lg:mt-0">
               <div className="sticky top-8 space-y-6">
-                {/* Booking Links */}
-                <div className="bg-white rounded-2xl shadow-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">🔗 予約リンク</h3>
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => handleBookingClick('hotel')}
-                      className="w-full bg-blue-50 hover:bg-blue-100 p-4 rounded-lg transition-colors text-left group"
-                    >
-                      <div className="flex items-center">
-                        <div className="text-2xl mr-3 group-hover:scale-110 transition-transform">🏨</div>
-                        <div>
-                          <div className="font-medium text-gray-900">宿泊施設を予約</div>
-                          <div className="text-sm text-gray-600">おすすめホテル・旅館</div>
-                        </div>
-                        <svg className="w-5 h-5 ml-auto text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </button>
-                    
-                    <button
-                      onClick={() => handleBookingClick('transport')}
-                      className="w-full bg-green-50 hover:bg-green-100 p-4 rounded-lg transition-colors text-left group"
-                    >
-                      <div className="flex items-center">
-                        <div className="text-2xl mr-3 group-hover:scale-110 transition-transform">🚗</div>
-                        <div>
-                          <div className="font-medium text-gray-900">交通手段を予約</div>
-                          <div className="text-sm text-gray-600">電車・バス・レンタカー</div>
-                        </div>
-                        <svg className="w-5 h-5 ml-auto text-gray-400 group-hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </button>
-                    
-                    <button
-                      onClick={() => handleBookingClick('tickets')}
-                      className="w-full bg-purple-50 hover:bg-purple-100 p-4 rounded-lg transition-colors text-left group"
-                    >
-                      <div className="flex items-center">
-                        <div className="text-2xl mr-3 group-hover:scale-110 transition-transform">🎫</div>
-                        <div>
-                          <div className="font-medium text-gray-900">チケット・体験予約</div>
-                          <div className="text-sm text-gray-600">入場券・アクティビティ</div>
-                        </div>
-                        <svg className="w-5 h-5 ml-auto text-gray-400 group-hover:text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
                 {/* Plan Summary */}
                 <div className="bg-white rounded-2xl shadow-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 プラン概要</h3>
@@ -865,11 +1002,69 @@ export default function PlansPage() {
                       <span className="text-gray-600">予算目安</span>
                       <span className="font-medium">{selectedPlanData.hero.budget}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">テーマ</span>
-                      <span className="font-medium capitalize">{selectedPlanData.theme.replace('_', ' ')}</span>
-                    </div>
+                    {startDate && endDate && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">旅行日程</span>
+                        <span className="font-medium text-blue-600">{startDate} 〜 {endDate}</span>
+                      </div>
+                    )}
                   </div>
+                  
+                  {/* 日程設定ボタン */}
+                  <button
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className="w-full mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg font-medium transition-colors flex items-center justify-center"
+                  >
+                    <span className="mr-2">📅</span>
+                    {startDate && endDate ? '日程を変更' : '具体的な日程を設定'}
+                  </button>
+
+                  {/* 日程選択フォーム */}
+                  {showDatePicker && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                      <h4 className="font-medium text-gray-900 mb-3">旅行日程を選択</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            出発日
+                          </label>
+                          <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            帰着日
+                          </label>
+                          <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            min={startDate || new Date().toISOString().split('T')[0]}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={handleDateConfirm}
+                            className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                          >
+                            確定
+                          </button>
+                          <button
+                            onClick={() => setShowDatePicker(false)}
+                            className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-400 transition-colors"
+                          >
+                            キャンセル
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   <button
                     onClick={handleConfirmPlan}
@@ -881,18 +1076,64 @@ export default function PlansPage() {
                     </svg>
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
 
-                {/* Additional Info */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
-                  <h4 className="font-semibold text-gray-900 mb-2">💡 お得な情報</h4>
-                  <p className="text-sm text-gray-700 mb-3">
-                    早期予約で最大20%オフ！宿泊施設とセットで予約するとさらにお得です。
-                  </p>
-                  <div className="text-xs text-blue-600 font-medium">
-                    キャンペーン期間: 6月末まで
+          {/* 新たなプラン生成フォーム */}
+          <div className="mt-8">
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <span className="mr-2">✨</span>
+                プランをカスタマイズ
+              </h3>
+              <p className="text-gray-600 mb-6">
+                現在のプランをベースに、あなたの追加の要望を反映した新しいプランを生成できます。
+              </p>
+              
+              {!showRegenerateForm ? (
+                <button
+                  onClick={() => setShowRegenerateForm(true)}
+                  className="bg-gradient-to-r from-purple-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center"
+                >
+                  <span className="mr-2">🎯</span>
+                  プランをカスタマイズする
+                </button>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      追加の要望やリクエスト
+                    </label>
+                    <textarea
+                      value={additionalPrompt}
+                      onChange={(e) => setAdditionalPrompt(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                      rows="4"
+                      placeholder="例: もっと自然を楽しめるスポットを追加してください、予算を抑えたい、子供向けの施設を含めてください、など"
+                    />
+                  </div>
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={handleRegenerateWithPrompt}
+                      disabled={!additionalPrompt.trim()}
+                      className="bg-purple-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
+                    >
+                      <span className="mr-2">🚀</span>
+                      新しいプランを生成
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowRegenerateForm(false);
+                        setAdditionalPrompt('');
+                      }}
+                      className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-400 transition-colors"
+                    >
+                      キャンセル
+                    </button>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
           </BlurredContent>

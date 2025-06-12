@@ -3,10 +3,12 @@ import { NextResponse } from 'next/server';
 export async function POST(request) {
   try {
     const { waypoints } = await request.json();
+    console.log('Directions API リクエスト:', waypoints);
 
     if (!waypoints || !Array.isArray(waypoints) || waypoints.length < 2) {
+      console.error('不正なwaypoints:', waypoints);
       return NextResponse.json(
-        { error: 'At least 2 waypoints are required' },
+        { error: 'At least 2 waypoints are required', waypoints },
         { status: 400 }
       );
     }
@@ -33,11 +35,14 @@ export async function POST(request) {
     const directionsData = await directionsResponse.json();
 
     if (directionsData.status !== 'OK') {
+      console.error('Directions API エラー:', directionsData.status, directionsData.error_message, 'waypoints:', waypoints);
       return NextResponse.json(
-        { error: 'Failed to get directions', details: directionsData.error_message },
+        { error: 'Failed to get directions', details: directionsData.error_message, status: directionsData.status, waypoints },
         { status: 400 }
       );
     }
+
+    console.log('Directions API 成功:', waypoints);
 
     // Static Map URLを生成
     const route = directionsData.routes[0];

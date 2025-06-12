@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LocalStorage Setup</title>
+</head>
+<body>
+    <h1>プランデータをlocalStorageに設定</h1>
+    <button onclick="setupMockData()">モックデータを設定</button>
+    <button onclick="clearData()">データをクリア</button>
+    <button onclick="checkData()">データを確認</button>
+    <div id="result"></div>
+
+    <script>
+        const mockPlans = [
+            {
+                "trip_id": "shirakawa_takayama_2024",
+                "theme": "wabi_sabi",
+                "hero": {
+                    "title": "白川郷",
+                    "subtitle": "合掌造りが織りなす静寂の風景",
+                    "destination": "岐阜県",
+                    "duration": "2日間",
+                    "budget": "¥30,000 - ¥50,000",
+                    "hero_image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=1600&h=900&fit=crop",
+                    "key_visual": {
+                        "main_image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=1600&h=900&fit=crop",
+                        "alt_images": [
+                            "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=1600&h=900&fit=crop",
+                            "https://images.unsplash.com/photo-1578321272176-b7bbc0679853?w=1600&h=900&fit=crop"
+                        ],
+                        "mood": "serene_traditional"
+                    },
+                    "highlights": [
+                        "合掌造りの世界遺産",
+                        "本場の飛騨牛グルメ",
+                        "江戸時代の街並み散策"
+                    ]
+                },
+                "itinerary": [
+                    {
+                        "day": 1,
+                        "date": "2025-10-15",
+                        "city": {
+                            "name": "飛騨高山",
+                            "name_en": "Hida-Takayama",
+                            "description": "江戸時代の面影を残す古い町並み",
+                            "image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=400&fit=crop"
+                        },
+                        "activities": [
+                            {
+                                "id": "takayama_jinya",
+                                "time": "10:00 - 12:00",
+                                "title": "高山陣屋",
+                                "subtitle": "江戸時代の歴史を体感",
+                                "type": "heritage",
+                                "priority": "must_see",
+                                "image": "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=600&h=400&fit=crop",
+                                "description": "江戸時代から明治初期まで郡代・代官が政務を行った役所。",
+                                "location": "高山陣屋",
+                                "price": "¥440",
+                                "rating": 4.6,
+                                "tips": "朝一番の訪問がおすすめ。"
+                            }
+                        ]
+                    },
+                    {
+                        "day": 2,
+                        "date": "2025-10-16",
+                        "city": {
+                            "name": "白川郷",
+                            "name_en": "Shirakawa-go",
+                            "description": "世界遺産の合掌造り集落",
+                            "image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=400&fit=crop"
+                        },
+                        "activities": [
+                            {
+                                "id": "gassho_village",
+                                "time": "09:00 - 10:30",
+                                "title": "合掌造り集落散策",
+                                "subtitle": "世界遺産の絶景を歩く",
+                                "type": "scenic",
+                                "priority": "must_see",
+                                "image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=600&h=400&fit=crop",
+                                "description": "1995年にユネスコ世界遺産に登録された美しい合掌造りの集落。",
+                                "location": "白川郷 荻町集落",
+                                "price": "無料",
+                                "rating": 4.9,
+                                "tips": "朝霧に包まれる早朝の景色は特に幻想的です。"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ];
+
+        function setupMockData() {
+            localStorage.setItem('travelPlans', JSON.stringify({ plans: mockPlans }));
+            document.getElementById('result').innerHTML = '<p style="color: green;">モックデータが設定されました</p>';
+        }
+
+        function clearData() {
+            localStorage.removeItem('travelPlans');
+            document.getElementById('result').innerHTML = '<p style="color: red;">データがクリアされました</p>';
+        }
+
+        function checkData() {
+            const data = localStorage.getItem('travelPlans');
+            if (data) {
+                const parsed = JSON.parse(data);
+                document.getElementById('result').innerHTML = '<p style="color: blue;">データが存在します: ' + parsed.plans.length + ' プラン</p>';
+            } else {
+                document.getElementById('result').innerHTML = '<p style="color: red;">データが存在しません</p>';
+            }
+        }
+    </script>
+</body>
+</html>

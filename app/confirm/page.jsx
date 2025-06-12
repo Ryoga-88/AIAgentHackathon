@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getMockSchedule } from "../../data/mockData";
 
@@ -7,7 +7,16 @@ export default function ConfirmPage() {
   const router = useRouter();
   const [exportFormat, setExportFormat] = useState('pdf');
   const [isExporting, setIsExporting] = useState(false);
+  const [planWithDates, setPlanWithDates] = useState(null);
   const plan = getMockSchedule();
+
+  useEffect(() => {
+    // ローカルストレージから日程付きプランデータを取得
+    const storedPlanWithDates = localStorage.getItem('selectedPlanWithDates');
+    if (storedPlanWithDates) {
+      setPlanWithDates(JSON.parse(storedPlanWithDates));
+    }
+  }, []);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -63,6 +72,40 @@ export default function ConfirmPage() {
               <div className="text-gray-600">{plan.hero.budget}</div>
             </div>
           </div>
+
+          {/* 具体的な日程表示 */}
+          {planWithDates?.travel_dates && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-8 border border-blue-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                <span className="mr-2">🗓️</span>
+                確定した旅行日程
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="text-center p-3 bg-white rounded-lg">
+                  <div className="text-sm text-gray-600 mb-1">出発日</div>
+                  <div className="text-lg font-semibold text-blue-700">
+                    {new Date(planWithDates.travel_dates.start).toLocaleDateString('ja-JP', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      weekday: 'short'
+                    })}
+                  </div>
+                </div>
+                <div className="text-center p-3 bg-white rounded-lg">
+                  <div className="text-sm text-gray-600 mb-1">帰着日</div>
+                  <div className="text-lg font-semibold text-blue-700">
+                    {new Date(planWithDates.travel_dates.end).toLocaleDateString('ja-JP', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      weekday: 'short'
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Quick Itinerary */}
           <div className="border-t pt-8">
