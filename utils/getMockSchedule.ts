@@ -1,4 +1,4 @@
-// utils/getMockSchedule.ts
+// utils/getMockSchedule.ts - TypeScript version
 import { TravelSchedule } from '@/types/travel';
 
 export function getMockSchedule(): TravelSchedule {
