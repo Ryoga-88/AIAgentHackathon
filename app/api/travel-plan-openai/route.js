@@ -12,7 +12,7 @@ const defaultPromptTemplate = `
 
 **基本条件:**
 - 目的地: {{destination}}
-- 期間: {{duration}}
+- 日付: {{date}}
 - 予算: {{budget}}
 - 人数: {{number_of_people}}
 - 興味: {{interests}}
@@ -79,7 +79,7 @@ const defaultPromptTemplate = `
         "title": "メインタイトル",
         "subtitle": "サブタイトル・キャッチフレーズ",
         "destination": "目的地",
-        "duration": "期間（日数）",
+        "date": "日付",
         "budget": "予算の目安",
         "highlights": [
           "旅行のハイライト1",
@@ -177,7 +177,7 @@ export async function POST(request) {
     // リクエストからパラメータを取得
     const { 
       destination, 
-      duration, 
+      date, 
       budget, 
       number_of_people, 
       interests, 
@@ -238,7 +238,7 @@ export async function POST(request) {
     // プロンプトにパラメータを埋め込む
     let filledPrompt = promptToUse
       .replace('{{destination}}', destination || '')
-      .replace('{{duration}}', duration || '')
+      .replace('{{date}}', date || '')
       .replace('{{budget}}', budget || '')
       .replace('{{number_of_people}}', number_of_people || '')
       .replace('{{interests}}', interests || '')
