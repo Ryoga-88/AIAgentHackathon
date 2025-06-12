@@ -391,6 +391,26 @@ export default function Home() {
               </div>
             </div>
 
+            {/* 参加者の要望セクション */}
+            <div className="pt-6 border-t border-gray-200">
+              <div className="mb-4">
+                <h3 className="text-lg font-medium">参加者の要望</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  旅行に参加する方の個別の要望があれば教えてください
+                </p>
+              </div>
+              
+              <div>
+                <textarea
+                  rows={4}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  placeholder="例:&#10;・お寿司が食べたい&#10;・温泉に入りたい&#10;・写真映えするスポットに行きたい&#10;・お土産を買いたい&#10;・のんびり過ごしたい&#10;・アクティブに動き回りたい"
+                  value={formData.additionalRequests || ''}
+                  onChange={(e) => setFormData({...formData, additionalRequests: e.target.value})}
+                />
+              </div>
+            </div>
+
             {/* Submit Button */}
             <div className="text-center pt-6">
               <button
