@@ -1,9 +1,18 @@
+import { NextResponse } from 'next/server';
+
 export async function POST(request) {
   const body = await request.json();
   const { location } = body;
 
   try {
-    const apiKey = "AIzaSyCB_NyYDaauWJHRGBsX4vn9fQvq6_Hxvzo";
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    
+    if (!apiKey) {
+      return Response.json(
+        { error: 'Google Maps API key is not configured' },
+        { status: 500 }
+      );
+    }
 
     // Step 1: Geocoding APIで位置情報を取得
     const geocodingResponse = await fetch(
@@ -12,7 +21,7 @@ export async function POST(request) {
     const geocodingData = await geocodingResponse.json();
 
     if (geocodingData.status !== "OK" || !geocodingData.results.length) {
-      return Response.json(
+      return NextResponse.json(
         { message: "位置情報が見つかりませんでした" },
         { status: 404 }
       );
@@ -51,7 +60,7 @@ export async function POST(request) {
     // Step 3: Static Maps APIでマップ画像を取得
     const mapImageUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${coordinates.lat},${coordinates.lng}&zoom=15&size=800x400&maptype=roadmap&markers=color:red%7C${coordinates.lat},${coordinates.lng}&key=${apiKey}`;
 
-    return Response.json({
+    return NextResponse.json({
       location: location,
       coordinates: coordinates,
       place_details: placeDetails,
@@ -62,7 +71,7 @@ export async function POST(request) {
 
   } catch (error) {
     console.error("Google Maps API エラー:", error);
-    return Response.json(
+    return NextResponse.json(
       {
         message: "位置情報の取得中にエラーが発生しました",
         error: error.message,

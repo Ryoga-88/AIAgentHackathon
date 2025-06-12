@@ -1,9 +1,24 @@
-export async function POST(request) {
-  const body = await request.json();
-  const { placeName } = body;
+import { NextResponse } from 'next/server';
 
+export async function POST(request) {
   try {
-    const apiKey = "AIzaSyCB_NyYDaauWJHRGBsX4vn9fQvq6_Hxvzo";
+    const body = await request.json();
+    const { placeName } = body;
+
+    if (!placeName) {
+      return NextResponse.json(
+        { error: 'placeName is required' },
+        { status: 400 }
+      );
+    }
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    
+    if (!apiKey) {
+      return Response.json(
+        { error: 'Google Maps API key is not configured' },
+        { status: 500 }
+      );
+    }
 
     // Places Text Search APIで場所を検索
     const textSearchResponse = await fetch(
@@ -13,7 +28,7 @@ export async function POST(request) {
     const textSearchData = await textSearchResponse.json();
 
     if (textSearchData.status !== "OK" || !textSearchData.results.length) {
-      return Response.json(
+      return NextResponse.json(
         { 
           message: "場所が見つかりませんでした",
           place_name: placeName
@@ -65,7 +80,7 @@ export async function POST(request) {
       // Details取得に失敗してもText Searchの結果は返す
     }
 
-    return Response.json({
+    return NextResponse.json({
       place_name: placeName,
       place_details: placeDetails,
       photo_url: photoUrl,
@@ -77,7 +92,7 @@ export async function POST(request) {
 
   } catch (error) {
     console.error("Places API エラー:", error);
-    return Response.json(
+    return NextResponse.json(
       {
         message: "場所情報の取得中にエラーが発生しました",
         error: error.message,

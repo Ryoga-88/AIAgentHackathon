@@ -12,15 +12,56 @@ export default function Home() {
     interests: []
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     
-    // デモ用: 1秒後にプラン一覧ページに遷移
-    setTimeout(() => {
+    try {
+      // フォームデータを適切な形式に変換
+      const requestData = {
+        destination: formData.destination,
+        duration: `${formData.duration}日間`,
+        budget: `${formData.budget.toLocaleString()}円`,
+        number_of_people: `${formData.people}人`,
+        interests: formData.interests.map(id => interests.find(i => i.id === id)?.label).filter(Boolean).join(', '),
+        additional_requests: '',
+        participants: []
+      };
+
+      console.log('🚀 Sending request data:', requestData); // デバッグ用
+
+      // OpenAI APIを呼び出してプランを生成
+      const response = await fetch('/api/travel-plan-openai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      console.log('📡 API Response status:', response.status); // デバッグ用
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Received data:', data); // デバッグ用
+      
+      // LocalStorageに結果を保存
+      localStorage.setItem('travelPlans', JSON.stringify(data));
+      console.log('💾 Saved to localStorage'); // デバッグ用
+      
+      // プラン一覧ページに遷移
       router.push('/plans');
-    }, 1000);
+    } catch (err) {
+      console.error('❌ Error:', err); // デバッグ用
+      setError(`プラン生成エラー: ${err.message}`);
+      setLoading(false);
+    }
   };
 
   const handleInterestToggle = (interest) => {
@@ -74,6 +115,13 @@ export default function Home() {
               数分で、あなただけの特別な旅程を作成します
             </p>
           </div>
+
+          {/* エラー表示 */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600">{error}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Destination */}

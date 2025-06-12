@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function TestAPIPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     destination: '',
     duration: '',
@@ -174,6 +176,10 @@ export default function TestAPIPage() {
 
       const data = await response.json();
       setResult(data);
+      
+      // LocalStorageに結果を保存
+      localStorage.setItem('travelPlans', JSON.stringify(data));
+      
       setActiveTab('result');
     } catch (err) {
       setError(`エラー: ${err.message}`);
@@ -581,6 +587,24 @@ export default function TestAPIPage() {
                   <pre className="bg-gray-100 p-4 rounded-md overflow-auto text-xs max-h-96">
                     {JSON.stringify(result, null, 2)}
                   </pre>
+                </div>
+                
+                {/* プランページへの移動 */}
+                <div className="pt-6 border-t border-gray-200">
+                  <div className="flex justify-center">
+                    <button
+                      onClick={() => router.push('/plans')}
+                      className="bg-gradient-to-r from-green-600 to-emerald-700 text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center"
+                    >
+                      <span>詳細なプランページで確認</span>
+                      <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="text-center text-sm text-gray-600 mt-2">
+                    生成されたプランが自動保存されました。詳細画面で編集・予約が可能です。
+                  </p>
                 </div>
               </div>
             ) : (

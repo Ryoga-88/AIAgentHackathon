@@ -11,18 +11,60 @@ export default function PlansPage() {
   const [expandedDay, setExpandedDay] = useState(null);
   const [regeneratingActivity, setRegeneratingActivity] = useState(null);
   const [regenerateComment, setRegenerateComment] = useState('');
-  const [plans, setPlans] = useState(getMockPlans());
+  const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hotels, setHotels] = useState({});
   const [locationData, setLocationData] = useState({});
   const [activityImages, setActivityImages] = useState({});
   const [routeData, setRouteData] = useState({});
 
+  // LLMの出力データまたはローカルストレージからプランを取得
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        // まずローカルストレージから最新のプランを確認
+        const storedPlans = localStorage.getItem('travelPlans');
+        console.log('LocalStorage data:', storedPlans); // デバッグ用
+        
+        if (storedPlans) {
+          const parsedPlans = JSON.parse(storedPlans);
+          console.log('Parsed plans:', parsedPlans); // デバッグ用
+          
+          if (parsedPlans.plans && Array.isArray(parsedPlans.plans)) {
+            console.log('Using LLM plans (multiple):', parsedPlans.plans.length); // デバッグ用
+            setPlans(parsedPlans.plans);
+          } else if (Array.isArray(parsedPlans)) {
+            console.log('Using LLM plans (array):', parsedPlans.length); // デバッグ用
+            setPlans(parsedPlans);
+          } else {
+            // 単一プランの場合は配列に変換
+            console.log('Using LLM plans (single)'); // デバッグ用
+            setPlans([parsedPlans]);
+          }
+        } else {
+          // ローカルストレージにデータがない場合はMockデータを使用
+          console.log('Using mock data'); // デバッグ用
+          const mockPlans = getMockPlans();
+          setPlans(mockPlans);
+        }
+      } catch (error) {
+        console.error('プランの取得に失敗:', error);
+        // エラー時はMockデータを使用
+        const mockPlans = getMockPlans();
+        setPlans(mockPlans);
+      }
+    };
+
+    fetchPlans();
+  }, []);
+
   // 位置情報とホテル情報を取得
   useEffect(() => {
+    if (plans.length === 0) return;
+
     const fetchData = async () => {
       try {
-        const mockPlans = getMockPlans();
+        const mockPlans = plans;
         
         // 全プランから位置情報を抽出
         const allLocations = new Set();
@@ -37,7 +79,7 @@ export default function PlansPage() {
         setLocationData(locationResults);
 
         // 各プランの主要都市でホテルを並行検索（パフォーマンス改善）
-        const hotelPromises = mockPlans.map(async (plan) => {
+        const hotelPromises = plans.map(async (plan) => {
           const mainDestination = plan.hero.title;
           if (locationResults[mainDestination] && locationResults[mainDestination].coordinates) {
             try {
@@ -78,7 +120,7 @@ export default function PlansPage() {
         const activityImagePromises = [];
         const activityImageResults = {};
         
-        for (const plan of mockPlans) {
+        for (const plan of plans) {
           activityImageResults[plan.trip_id] = {};
           
           for (const day of plan.itinerary || []) {
@@ -126,7 +168,7 @@ export default function PlansPage() {
         const routePromises = [];
         const routeResults = {};
 
-        for (const plan of mockPlans) {
+        for (const plan of plans) {
           routeResults[plan.trip_id] = {};
           
           // 全体プランルート
@@ -211,7 +253,7 @@ export default function PlansPage() {
     };
 
     fetchData();
-  }, []);
+  }, [plans]);
 
   const handlePlanSelect = (planIndex) => {
     setSelectedPlan(planIndex);
@@ -280,6 +322,27 @@ export default function PlansPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Debug Info - 開発時のみ表示 */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <h3 className="text-sm font-medium text-yellow-800 mb-2">🔧 デバッグ情報</h3>
+            <div className="text-xs text-yellow-700">
+              <p>プラン数: {plans.length}</p>
+              <p>データソース: {plans.length > 0 && plans[0].trip_id?.includes('mock') ? 'Mock データ' : 'LLM データ'}</p>
+              <p>LocalStorage: {typeof window !== 'undefined' && localStorage.getItem('travelPlans') ? '有り' : '無し'}</p>
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('travelPlans');
+                  window.location.reload();
+                }}
+                className="mt-2 px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+              >
+                LocalStorageクリア & リロード
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Plan Selection Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {plans.map((plan, index) => (
