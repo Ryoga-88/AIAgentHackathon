@@ -10,13 +10,13 @@ export function getMockSchedule() {
       "destination": "岐阜県",
       "duration": "2日間",
       "budget": "¥30,000 - ¥50,000",
-      "hero_image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=1600&h=900&fit=crop",
-      // key_visualを追加
+      "hero_image": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=1600&maxheight=900&photoreference=shirakawa_main_01&key=API_KEY",
       "key_visual": {
-        "main_image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=1600&h=900&fit=crop",
+        "main_image": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=1920&maxheight=1280&photoreference=shirakawa_gassho_village_01&key=API_KEY",
         "alt_images": [
-          "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=1600&h=900&fit=crop",
-          "https://images.unsplash.com/photo-1578321272176-b7bbc0679853?w=1600&h=900&fit=crop"
+          "https://maps.googleapis.com/maps/api/place/photo?maxwidth=1920&maxheight=1280&photoreference=shirakawa_winter_view_01&key=API_KEY",
+          "https://maps.googleapis.com/maps/api/place/photo?maxwidth=1920&maxheight=1280&photoreference=shirakawa_autumn_view_01&key=API_KEY",
+          "https://maps.googleapis.com/maps/api/place/photo?maxwidth=1920&maxheight=1280&photoreference=shirakawa_spring_view_01&key=API_KEY"
         ],
         "mood": "serene_traditional"
       },
@@ -34,7 +34,7 @@ export function getMockSchedule() {
           "name": "飛騨高山",
           "name_en": "Hida-Takayama",
           "description": "江戸時代の面影を残す古い町並み",
-          "image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=400&fit=crop"
+          "image": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&maxheight=400&photoreference=takayama_old_town_01&key=API_KEY"
         },
         "activities": [
           {
@@ -44,7 +44,7 @@ export function getMockSchedule() {
             "subtitle": "江戸時代の歴史を体感",
             "type": "heritage",
             "priority": "must_see",
-            "image": "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=600&h=400&fit=crop",
+            "image": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&maxheight=400&photoreference=takayama_jinya_01&key=API_KEY",
             "description": "江戸時代から明治初期まで郡代・代官が政務を行った役所。現存する唯一の代官所として国史跡に指定されています。",
             "location": "高山陣屋",
             "price": "¥440",
@@ -58,7 +58,7 @@ export function getMockSchedule() {
             "subtitle": "古い町並みで味わう極上グルメ",
             "type": "culinary",
             "priority": "recommended",
-            "image": "https://images.unsplash.com/photo-1553621042-f6e147245754?w=600&h=400&fit=crop",
+            "image": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&maxheight=400&photoreference=hida_beef_sushi_01&key=API_KEY",
             "description": "A5ランクの飛騨牛を使った贅沢なにぎり寿司。口の中でとろける極上の味わい。",
             "location": "古い町並み",
             "price": "¥2,000",
@@ -72,7 +72,7 @@ export function getMockSchedule() {
             "subtitle": "タイムスリップした江戸の街道",
             "type": "experience",
             "priority": "must_do",
-            "image": "https://images.unsplash.com/photo-1578321272176-b7bbc0679853?w=600&h=400&fit=crop",
+            "image": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&maxheight=400&photoreference=takayama_sanmachi_01&key=API_KEY",
             "description": "江戸時代の商家建築が軒を連ねる、まさに生きた博物館。酒蔵、味噌屋、雑貨店など、昔ながらの商いが今も続いています。",
             "location": "上三之町・上二之町・上一之町",
             "price": "無料",
@@ -88,7 +88,7 @@ export function getMockSchedule() {
           "name": "白川郷",
           "name_en": "Shirakawa-go",
           "description": "世界遺産の合掌造り集落",
-          "image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=400&fit=crop"
+          "image": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&maxheight=400&photoreference=shirakawa_village_01&key=API_KEY"
         },
         "activities": [
           {
@@ -98,7 +98,7 @@ export function getMockSchedule() {
             "subtitle": "世界遺産の絶景を歩く",
             "type": "scenic",
             "priority": "must_see",
-            "image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=600&h=400&fit=crop",
+            "image": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&maxheight=400&photoreference=shirakawa_gassho_houses_01&key=API_KEY",
             "description": "1995年にユネスコ世界遺産に登録された美しい合掌造りの集落。四季折々の自然と調和した、日本の原風景が広がります。",
             "location": "白川郷 荻町集落",
             "price": "無料",

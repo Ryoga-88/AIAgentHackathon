@@ -63,19 +63,43 @@ export const THEME_DEFINITIONS = {
     activity_styles: {
       heritage: { 
         gradient: "linear-gradient(135deg, #8b4513 0%, #5d4e37 100%)",
-        accent: "#8b4513"
+        accent: "#8b4513"  // 古木の色
       },
       culinary: { 
         gradient: "linear-gradient(135deg, #cd7f32 0%, #b8661f 100%)",
-        accent: "#cd7f32"
+        accent: "#cd7f32"  // 古銅色
       },
       experience: { 
         gradient: "linear-gradient(135deg, #7ba05b 0%, #5e7d45 100%)",
-        accent: "#7ba05b"
+        accent: "#7ba05b"  // 抹茶グリーン
       },
       scenic: { 
         gradient: "linear-gradient(135deg, #5e7d45 0%, #3d4f2d 100%)",
-        accent: "#5e7d45"
+        accent: "#5e7d45"  // 深い緑
+      },
+      cultural: { 
+        gradient: "linear-gradient(135deg, #5d4e37 0%, #4a3728 100%)",
+        accent: "#5d4e37"  // 深い茶
+      },
+      art: { 
+        gradient: "linear-gradient(135deg, #b8661f 0%, #8b4513 100%)",
+        accent: "#b8661f"  // 濃い銅
+      },
+      nature: { 
+        gradient: "linear-gradient(135deg, #3d4f2d 0%, #2f1b14 100%)",
+        accent: "#3d4f2d"  // 深山の緑
+      },
+      wellness: { 
+        gradient: "linear-gradient(135deg, #f7ddd6 0%, #cd7f32 100%)",
+        accent: "#f7ddd6"  // 薄朱色
+      },
+      adventure: { 
+        gradient: "linear-gradient(135deg, #4a3728 0%, #2f1b14 100%)",
+        accent: "#4a3728"  // 焦げ茶
+      },
+      beach: { 
+        gradient: "linear-gradient(135deg, #d4e4c8 0%, #7ba05b 100%)",
+        accent: "#d4e4c8"  // 薄抹茶
       }
     }
   },
@@ -142,21 +166,45 @@ export const THEME_DEFINITIONS = {
       premium: "0 25px 50px rgba(30, 64, 175, 0.25)"
     },
     activity_styles: {
-      beach: { 
-        gradient: "linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)",
-        accent: "#1e40af"
-      },
-      cultural: { 
+      heritage: { 
         gradient: "linear-gradient(135deg, #64748b 0%, #475569 100%)",
-        accent: "#64748b"
+        accent: "#64748b"  // スレートグレー
       },
       culinary: { 
         gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-        accent: "#f59e0b"
+        accent: "#f59e0b"  // サンセットゴールド
+      },
+      experience: { 
+        gradient: "linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)",
+        accent: "#1e40af"  // 地中海ブルー
       },
       scenic: { 
-        gradient: "linear-gradient(135deg, #1d4ed8 0%, #f59e0b 100%)",
-        accent: "#1d4ed8"
+        gradient: "linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%)",
+        accent: "#1d4ed8"  // ロイヤルブルー
+      },
+      cultural: { 
+        gradient: "linear-gradient(135deg, #475569 0%, #1e293b 100%)",
+        accent: "#475569"  // 石色
+      },
+      art: { 
+        gradient: "linear-gradient(135deg, #d97706 0%, #92400e 100%)",
+        accent: "#d97706"  // 深いゴールド
+      },
+      nature: { 
+        gradient: "linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%)",
+        accent: "#1e3a8a"  // 深海の青
+      },
+      wellness: { 
+        gradient: "linear-gradient(135deg, #fefefe 0%, #f8fafc 100%)",
+        accent: "#64748b"  // スレートグレー
+      },
+      adventure: { 
+        gradient: "linear-gradient(135deg, #1e40af 0%, #f59e0b 100%)",
+        accent: "#1e40af"  // 地中海ブルー
+      },
+      beach: { 
+        gradient: "linear-gradient(135deg, #e8f4fd 0%, #1e40af 100%)",
+        accent: "#1e40af"  // 地中海ブルー
       }
     }
   },
@@ -225,20 +273,21 @@ export const THEME_DEFINITIONS = {
     activity_styles: {
       heritage: { 
         gradient: "linear-gradient(135deg, #8b4513 0%, #654321 100%)",
-        accent: "#8b4513"
+        accent: "#8b4513"  // サドルブラウン
       },
       culinary: { 
         gradient: "linear-gradient(135deg, #722f37 0%, #5f1a20 100%)",
-        accent: "#722f37"
+        accent: "#722f37"  // ワインレッド
       },
       art: { 
         gradient: "linear-gradient(135deg, #a0522d 0%, #8b4513 100%)",
-        accent: "#a0522d"
+        accent: "#a0522d"  // シエナ
       },
       scenic: { 
         gradient: "linear-gradient(135deg, #8fbc8f 0%, #6b8e23 100%)",
-        accent: "#8fbc8f"
-      }
+        accent: "#8fbc8f"  // ダークシーグリーン
+      },
+      // ... 他のカテゴリも追加
     }
   },
 
@@ -306,22 +355,27 @@ export const THEME_DEFINITIONS = {
       aurora: "0 0 20px rgba(5, 150, 105, 0.4), 0 0 40px rgba(190, 24, 93, 0.3)"
     },
     activity_styles: {
+      heritage: { 
+        gradient: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+        accent: "#1e293b"  // 深い青灰
+      },
+      culinary: { 
+        gradient: "linear-gradient(135deg, #be185d 0%, #9d174d 100%)",
+        accent: "#be185d"  // オーロラピンク
+      },
       nature: { 
         gradient: "linear-gradient(135deg, #059669 0%, #047857 100%)",
-        accent: "#059669"
-      },
-      cultural: { 
-        gradient: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-        accent: "#1e293b"
+        accent: "#059669"  // エメラルドグリーン
       },
       wellness: { 
         gradient: "linear-gradient(135deg, #be185d 0%, #9d174d 100%)",
-        accent: "#be185d"
+        accent: "#be185d"  // オーロラピンク
       },
       adventure: { 
         gradient: "linear-gradient(135deg, #059669 0%, #be185d 50%, #1e293b 100%)",
-        accent: "#059669"
-      }
+        accent: "#059669"  // エメラルドグリーン
+      },
+      // ... 他のカテゴリも追加
     }
   }
 };
