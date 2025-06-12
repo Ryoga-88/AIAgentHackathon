@@ -7,7 +7,7 @@ export default function TestAPIPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     destination: '',
-    duration: '',
+    date: '',
     budget: '',
     number_of_people: '',
     interests: '',
@@ -21,7 +21,7 @@ export default function TestAPIPage() {
       name: '東京2日間',
       data: {
         destination: '東京',
-        duration: '2日間',
+        date: '2025年3月15日〜16日',
         budget: '50000円',
         number_of_people: '2人',
         interests: '観光、グルメ',
@@ -36,7 +36,7 @@ export default function TestAPIPage() {
       name: '京都3日間',
       data: {
         destination: '京都',
-        duration: '3日間',
+        date: '2025年4月10日〜12日',
         budget: '80000円',
         number_of_people: '3人',
         interests: '歴史、文化、抹茶',
@@ -52,7 +52,7 @@ export default function TestAPIPage() {
       name: '大阪1日間',
       data: {
         destination: '大阪',
-        duration: '1日間',
+        date: '2025年5月20日',
         budget: '15000円',
         number_of_people: '2人',
         interests: 'グルメ、ショッピング',
@@ -67,7 +67,7 @@ export default function TestAPIPage() {
       name: 'カスタム',
       data: {
         destination: '',
-        duration: '',
+        date: '',
         budget: '',
         number_of_people: '',
         interests: '',
@@ -83,6 +83,11 @@ export default function TestAPIPage() {
   const [activeTab, setActiveTab] = useState('form');
   const [selectedPreset, setSelectedPreset] = useState('custom');
   const [selectedPlan, setSelectedPlan] = useState(0); // 選択中のプラン番号（0,1,2）
+  
+  // プラン修正関連のstate
+  const [isModifying, setIsModifying] = useState(false);
+  const [modificationRequest, setModificationRequest] = useState('');
+  const [modificationResult, setModificationResult] = useState(null);
 
   // プリセット選択ハンドラー
   const handlePresetChange = (presetKey) => {
@@ -94,7 +99,7 @@ export default function TestAPIPage() {
   const resetForm = () => {
     setFormData({
       destination: '',
-      duration: '',
+      date: '',
       budget: '',
       number_of_people: '',
       interests: '',
@@ -154,6 +159,53 @@ export default function TestAPIPage() {
   const updateParticipantArray = (index, field, value) => {
     const arrayValue = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
     updateParticipant(index, field, arrayValue);
+  };
+
+  // プラン修正ハンドラー
+  const handleModifyPlan = async () => {
+    if (!result || !result.plans || !modificationRequest.trim()) {
+      alert('修正するプランと修正要望を入力してください');
+      return;
+    }
+
+    setIsModifying(true);
+    setError(null);
+    setModificationResult(null);
+
+    try {
+      const selectedPlanData = result.plans[selectedPlan];
+      
+      const response = await fetch('/api/modify-travel-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          original_plan: selectedPlanData,
+          plan_number: selectedPlanData.plan_number,
+          modification_request: modificationRequest
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setModificationResult(data);
+      
+      // 元のプランを修正されたプランで置き換える
+      const updatedResult = { ...result };
+      updatedResult.plans[selectedPlan] = data.modified_plan;
+      setResult(updatedResult);
+      
+      setModificationRequest(''); // リクエストをクリア
+      
+    } catch (err) {
+      setError(`プラン修正エラー: ${err.message}`);
+    } finally {
+      setIsModifying(false);
+    }
   };
 
   const handleTravelPlanTest = async () => {
@@ -281,14 +333,15 @@ export default function TestAPIPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  期間
+                  日付
                 </label>
                 <input
                   type="text"
-                  name="duration"
-                  value={formData.duration}
+                  name="date"
+                  value={formData.date}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="例: 2025年3月15日〜16日"
                 />
               </div>
 
@@ -489,13 +542,71 @@ export default function TestAPIPage() {
                         <div><strong>Trip ID:</strong> {result.plans[selectedPlan].trip_id}</div>
                         <div><strong>テーマ:</strong> {result.plans[selectedPlan].theme}</div>
                         <div><strong>目的地:</strong> {result.plans[selectedPlan].hero?.destination}</div>
-                        <div><strong>期間:</strong> {result.plans[selectedPlan].hero?.duration}</div>
+                        <div><strong>日付:</strong> {result.plans[selectedPlan].hero?.date}</div>
                       </div>
                       {result.plans[selectedPlan].theme_description && (
                         <div className="mt-2 p-3 bg-blue-50 rounded-md">
                           <strong>テーマ説明:</strong> {result.plans[selectedPlan].theme_description}
                         </div>
                       )}
+                      
+                      {/* 修正結果の表示 */}
+                      {result.plans[selectedPlan].modification_summary && (
+                        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                          <strong>最新の修正:</strong> {result.plans[selectedPlan].modification_summary}
+                          <div className="text-xs text-green-600 mt-1">
+                            修正日時: {new Date(result.plans[selectedPlan].modified_at).toLocaleString('ja-JP')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* プラン修正セクション */}
+                    <div className="border-t border-gray-200 pt-4">
+                      <h3 className="text-lg font-medium mb-3">プラン修正</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            修正要望（プラン{result.plans[selectedPlan].plan_number}を修正します）
+                          </label>
+                          <textarea
+                            value={modificationRequest}
+                            onChange={(e) => setModificationRequest(e.target.value)}
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="例: 2日目の午後に美術館を追加してください、1日目の夕食を和食から洋食に変更してください"
+                          />
+                        </div>
+                        
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={handleModifyPlan}
+                            disabled={isModifying || !modificationRequest.trim()}
+                            className="flex-1 bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isModifying ? '修正中...' : 'プランを修正'}
+                          </button>
+                          
+                          <button
+                            onClick={() => setModificationRequest('')}
+                            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                          >
+                            クリア
+                          </button>
+                        </div>
+
+                        {modificationResult && (
+                          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-md">
+                            <h4 className="font-medium text-green-800 mb-2">修正完了</h4>
+                            <p className="text-sm text-green-700">
+                              <strong>修正内容:</strong> {modificationResult.modified_plan.modification_summary}
+                            </p>
+                            <p className="text-xs text-green-600 mt-1">
+                              元のプランが更新されました。上記の表示に反映されています。
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </>
                 ) : (
@@ -506,7 +617,7 @@ export default function TestAPIPage() {
                       <div><strong>Trip ID:</strong> {result.trip_id}</div>
                       <div><strong>テーマ:</strong> {result.theme}</div>
                       <div><strong>目的地:</strong> {result.hero?.destination}</div>
-                      <div><strong>期間:</strong> {result.hero?.duration}</div>
+                      <div><strong>日付:</strong> {result.hero?.date}</div>
                     </div>
                   </div>
                 )}
