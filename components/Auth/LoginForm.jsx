@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -20,6 +21,11 @@ export default function LoginForm() {
       return;
     }
 
+    if (!isLogin && !displayName.trim()) {
+      setError('表示名を入力してください');
+      return;
+    }
+
     try {
       setError('');
       setLoading(true);
@@ -27,10 +33,34 @@ export default function LoginForm() {
       if (isLogin) {
         await login(email, password);
       } else {
-        await signup(email, password);
+        await signup(email, password, displayName.trim());
       }
     } catch (error) {
-      setError('認証エラーが発生しました: ' + error.message);
+      console.error('Authentication error:', error);
+      let errorMessage = '認証エラーが発生しました';
+      
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'このメールアドレスは既に使用されています';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'パスワードは6文字以上で入力してください';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = '有効なメールアドレスを入力してください';
+          break;
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+          errorMessage = 'メールアドレスまたはパスワードが間違っています';
+          break;
+        case 'auth/invalid-credential':
+          errorMessage = 'メールアドレスまたはパスワードが間違っています';
+          break;
+        default:
+          errorMessage = error.message || '認証エラーが発生しました';
+      }
+      
+      setError(errorMessage);
     }
     
     setLoading(false);
@@ -42,7 +72,21 @@ export default function LoginForm() {
       setLoading(true);
       await loginWithGoogle();
     } catch (error) {
-      setError('Googleログインに失敗しました: ' + error.message);
+      console.error('Google login error:', error);
+      let errorMessage = 'Googleログインに失敗しました';
+      
+      switch (error.code) {
+        case 'auth/popup-closed-by-user':
+          errorMessage = 'ログインがキャンセルされました';
+          break;
+        case 'auth/popup-blocked':
+          errorMessage = 'ポップアップがブロックされました。ポップアップを許可してください';
+          break;
+        default:
+          errorMessage = error.message || 'Googleログインに失敗しました';
+      }
+      
+      setError(errorMessage);
     }
     setLoading(false);
   };
@@ -60,6 +104,23 @@ export default function LoginForm() {
       )}
       
       <form onSubmit={handleSubmit} className="space-y-4">
+        {!isLogin && (
+          <div>
+            <label htmlFor="displayName" className="block text-sm font-medium text-gray-700">
+              表示名
+            </label>
+            <input
+              type="text"
+              id="displayName"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="例: 山田太郎"
+              required={!isLogin}
+            />
+          </div>
+        )}
+        
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
             メールアドレス
