@@ -80,6 +80,7 @@ export default function TestAPIPage() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('form');
   const [selectedPreset, setSelectedPreset] = useState('custom');
+  const [selectedPlan, setSelectedPlan] = useState(0); // 選択中のプラン番号（0,1,2）
 
   // プリセット選択ハンドラー
   const handlePresetChange = (presetKey) => {
@@ -446,45 +447,131 @@ export default function TestAPIPage() {
             
             {result ? (
               <div className="space-y-6">
-                {/* 基本情報 */}
-                <div>
-                  <h3 className="text-lg font-medium mb-2">基本情報</h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><strong>Trip ID:</strong> {result.trip_id}</div>
-                    <div><strong>テーマ:</strong> {result.theme}</div>
-                    <div><strong>目的地:</strong> {result.hero?.destination}</div>
-                    <div><strong>期間:</strong> {result.hero?.duration}</div>
+                {/* プラン選択 */}
+                {result.plans && result.plans.length > 0 ? (
+                  <>
+                    <div className="border-b border-gray-200 pb-4">
+                      <h3 className="text-lg font-medium mb-3">プラン選択</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {result.plans.map((plan, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setSelectedPlan(index)}
+                            className={`px-4 py-2 rounded-md text-sm font-medium ${
+                              selectedPlan === index
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            プラン{plan.plan_number} 
+                            {plan.weather_type === 'sunny' ? '☀️ 晴れ' : '🌧️ 雨'}
+                            <div className="text-xs opacity-75">{plan.theme}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 選択されたプランの基本情報 */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-2">
+                        プラン{result.plans[selectedPlan].plan_number} - 基本情報
+                        <span className="ml-2 text-sm text-gray-500">
+                          ({result.plans[selectedPlan].weather_type === 'sunny' ? '晴れの日用' : '雨の日用'})
+                        </span>
+                      </h3>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div><strong>Trip ID:</strong> {result.plans[selectedPlan].trip_id}</div>
+                        <div><strong>テーマ:</strong> {result.plans[selectedPlan].theme}</div>
+                        <div><strong>目的地:</strong> {result.plans[selectedPlan].hero?.destination}</div>
+                        <div><strong>期間:</strong> {result.plans[selectedPlan].hero?.duration}</div>
+                      </div>
+                      {result.plans[selectedPlan].theme_description && (
+                        <div className="mt-2 p-3 bg-blue-50 rounded-md">
+                          <strong>テーマ説明:</strong> {result.plans[selectedPlan].theme_description}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  // 旧形式（単一プラン）の場合
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">基本情報</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div><strong>Trip ID:</strong> {result.trip_id}</div>
+                      <div><strong>テーマ:</strong> {result.theme}</div>
+                      <div><strong>目的地:</strong> {result.hero?.destination}</div>
+                      <div><strong>期間:</strong> {result.hero?.duration}</div>
+                    </div>
                   </div>
-                </div>
+                )}
 
 
                 {/* 日程詳細 */}
                 <div>
                   <h3 className="text-lg font-medium mb-2">日程詳細</h3>
                   <div className="space-y-4">
-                    {result.itinerary?.map((day, dayIndex) => (
-                      <div key={dayIndex} className="border border-gray-200 rounded-md p-4">
-                        <h4 className="font-medium mb-2">
-                          {day.day}日目 - {day.city?.name} ({day.date})
-                        </h4>
-                        
-                        {/* 活動一覧 */}
-                        <div className="space-y-2">
-                          {day.activities?.map((activity, actIndex) => (
-                            <div key={actIndex} className="pl-4 border-l-2 border-gray-200">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <strong>{activity.time}:</strong> {activity.title}
+                    {/* 新形式（3プラン）の場合 */}
+                    {result.plans && result.plans.length > 0 ? (
+                      result.plans[selectedPlan].itinerary?.map((day, dayIndex) => (
+                        <div key={dayIndex} className="border border-gray-200 rounded-md p-4">
+                          <h4 className="font-medium mb-2">
+                            {day.day}日目 - {day.city?.name} ({day.date})
+                          </h4>
+                          
+                          {/* 活動一覧 */}
+                          <div className="space-y-2">
+                            {day.activities?.map((activity, actIndex) => (
+                              <div key={actIndex} className="pl-4 border-l-2 border-gray-200">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <strong>{activity.time}:</strong> {activity.title}
+                                    {activity.type && (
+                                      <span className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded">
+                                        {activity.type}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="mt-1 text-sm text-gray-600">
+                                  📍 {activity.location}
+                                  {activity.price && <span className="ml-2">💰 {activity.price}</span>}
+                                </div>
+                                {activity.description && (
+                                  <div className="mt-1 text-sm text-gray-500">
+                                    {activity.description}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      // 旧形式（単一プラン）の場合
+                      result.itinerary?.map((day, dayIndex) => (
+                        <div key={dayIndex} className="border border-gray-200 rounded-md p-4">
+                          <h4 className="font-medium mb-2">
+                            {day.day}日目 - {day.city?.name} ({day.date})
+                          </h4>
+                          
+                          {/* 活動一覧 */}
+                          <div className="space-y-2">
+                            {day.activities?.map((activity, actIndex) => (
+                              <div key={actIndex} className="pl-4 border-l-2 border-gray-200">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <strong>{activity.time}:</strong> {activity.title}
+                                  </div>
+                                </div>
+                                <div className="mt-1 text-sm text-gray-600">
+                                  📍 {activity.location}
                                 </div>
                               </div>
-                              <div className="mt-1 text-sm text-gray-600">
-                                📍 {activity.location}
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
 

@@ -54,54 +54,84 @@ const defaultPromptTemplate = `
 **その他の要件:**
 - 一般的な観光情報に基づいて、実用的なプランを作成してください
 - 移動時間や交通手段も考慮した現実的なスケジュールにしてください
-- JSONのみを返し、説明文は含めないでください
+- **JSONのみを返し、説明文やコメントは一切含めないでください**
+- **出力は必ず有効なJSON形式にしてください**
+
+**重要な指示:**
+**必ず3つの異なる旅行プランを作成してください。以下の構成で作成してください：**
+- **プラン1（晴れの日用）**: 屋外活動を中心とした晴天時向けプラン
+- **プラン2（晴れの日用）**: 晴天時向けの別アプローチ（プラン1とは異なる視点・テーマ）
+- **プラン3（雨の日用）**: 屋内活動を中心とした雨天時向けプラン
+
+参加者の要望を満たしつつ、天候に応じた最適な活動を提案してください。
 
 **出力形式:**
-プランは以下の形式のJSONで出力してください：
+以下の形式のJSONで**3つのプラン**を配列として出力してください：
 {
-  "trip_id": "旅行ID（一意識別子）",
-  "theme": "旅行のテーマ（例：wabi_sabi, adventure, relax等）",
-  "hero": {
-    "title": "メインタイトル",
-    "subtitle": "サブタイトル・キャッチフレーズ",
-    "destination": "目的地",
-    "duration": "期間（日数）",
-    "budget": "予算の目安",
-    "highlights": [
-      "旅行のハイライト1",
-      "旅行のハイライト2",
-      "旅行のハイライト3"
-    ]
-  },
-  "itinerary": [
+  "plans": [
     {
-      "day": 1,
-      "date": "YYYY-MM-DD",
-      "city": {
-        "name": "都市名（日本語）",
-        "name_en": "City Name (English)",
-        "description": "都市の説明・特徴",
+      "plan_number": 1,
+      "trip_id": "旅行ID（一意識別子）",
+      "weather_type": "sunny",
+      "theme": "旅行のテーマ（例：wabi_sabi, adventure, relax等）",
+      "theme_description": "このプランのテーマの説明",
+      "hero": {
+        "title": "メインタイトル",
+        "subtitle": "サブタイトル・キャッチフレーズ",
+        "destination": "目的地",
+        "duration": "期間（日数）",
+        "budget": "予算の目安",
+        "highlights": [
+          "旅行のハイライト1",
+          "旅行のハイライト2",
+          "旅行のハイライト3"
+        ]
       },
-      "activities": [
+      "itinerary": [
         {
-          "id": "アクティビティID（一意識別子）",
-          "time": "HH:MM - HH:MM",
-          "title": "アクティビティのタイトル",
-          "subtitle": "アクティビティのサブタイトル",
-          "type": "アクティビティの種類（heritage, culinary, experience, scenic等）",
-          "priority": "優先度（must_see, must_do, recommended等）",
-          "description": "詳細な説明",
-          "location": "場所の名称",
-          "price": "料金",
-          "rating": "評価（数値）",
-          "tips": "おすすめのポイントやコツ",
-          "activity_english": "Activity description (English)",
-          "image_search_term": "City Name + Activity in English",
-          "category": "sightseeing, food, activity, shopping..etc",
-          "is_free": "アクティビティにお金がかかるか否か（bool）",
+          "day": 1,
+          "date": "YYYY-MM-DD",
+          "city": {
+            "name": "都市名（日本語）",
+            "name_en": "City Name (English)",
+            "description": "都市の説明・特徴",
+          },
+          "activities": [
+            {
+              "id": "アクティビティID（一意識別子）",
+              "time": "HH:MM - HH:MM",
+              "title": "アクティビティのタイトル",
+              "subtitle": "アクティビティのサブタイトル",
+              "type": "アクティビティの種類（heritage, culinary, experience, scenic等）",
+              "priority": "優先度（must_see, must_do, recommended等）",
+              "description": "詳細な説明",
+              "location": "場所の名称",
+              "price": "料金",
+              "rating": "評価（数値）",
+              "tips": "おすすめのポイントやコツ",
+              "activity_english": "Activity description (English)",
+              "image_search_term": "City Name + Activity in English",
+              "category": "sightseeing, food, activity, shopping..etc",
+              "is_free": "アクティビティにお金がかかるか否か（bool）",
+            }
+          ],
+          "accommodation": "宿泊予定の場所（市・地域）"
         }
-      ],
-      "accommodation": "宿泊予定の場所（市・地域）"
+      ]
+    },
+    {
+      "plan_number": 2,
+      "weather_type": "sunny",
+      "trip_id": "旅行ID2",
+      "theme": "別のテーマ",
+      "theme_description": "2つ目の晴れの日プランの説明（完全な構造を含む）"
+    },
+    {
+      "plan_number": 3,
+      "weather_type": "rainy",
+      "trip_id": "旅行ID3",
+      "theme": "雨の日テーマ",
+      "theme_description": "雨の日プランの説明（屋内活動中心・完全な構造を含む）"
     }
   ]
 }
@@ -136,38 +166,6 @@ export async function PUT(request) {
       { error: 'Failed to update prompt template', message: error.message },
       { status: 500 }
     );
-  }
-}
-
-/**
- * 文字列からMarkdownのコードブロック記号を削除し、JSON形式に整形する関数
- * @param {string} inputString - 整形したい文字列
- * @returns {Object|null} - パースされたJSONオブジェクト、エラーの場合はnull
- */
-function cleanAndParseJSON(inputString) {
-  let cleanedString = inputString;
-  try {
-    // 文字列の前後の空白を除去
-    cleanedString = inputString.trim();
-    
-    // ```json または ``` で始まる行を削除
-    cleanedString = cleanedString.replace(/^```json\s*/m, '');
-    cleanedString = cleanedString.replace(/^```\s*/m, '');
-    
-    // 末尾の ``` を削除
-    cleanedString = cleanedString.replace(/\s*```\s*$/m, '');
-    
-    // 再度前後の空白を除去
-    cleanedString = cleanedString.trim();
-    
-    // JSONをパースして返す
-    return JSON.parse(cleanedString);
-    
-  } catch (error) {
-    console.error('JSON parsing error:', error.message);
-    console.error('Problematic string:', cleanedString);
-    
-    return null;
   }
 }
 
@@ -249,14 +247,15 @@ export async function POST(request) {
     
     // OpenAI Chat Completions APIを呼び出し(検索機能持ちプランニングモデル)
     const response1 = await client.chat.completions.create({
-      model: "gpt-4o-search-preview-2025-03-11",
+      model: "gpt-4o",
       messages: [
         { 
           role: "system", 
-          content: "あなたは旅行プランの専門家です。指定されたJSON形式で正確に回答してください。" 
+          content: "あなたは旅行プランの専門家です。指定されたJSON形式で3つのプランを正確に出力してください。" 
         },
         { role: "user", content: filledPrompt }
       ],
+      response_format: { type: "json_object" },
       // max_tokens: 4000,
     });
     
@@ -269,24 +268,34 @@ export async function POST(request) {
       throw new Error('No content received from OpenAI API');
     }
 
-    // 新しいJSON整形関数を使用
-    const parsedJSON = cleanAndParseJSON(messageContent1);
-
-    if (parsedJSON === null) {
-      console.error('JSONの解析に失敗しました');
+    // JSONレスポンスをパース
+    let parsedJSON;
+    try {
+      parsedJSON = JSON.parse(messageContent1);
+    } catch (error) {
+      console.error('JSON parsing error:', error);
       throw new Error('Failed to parse JSON from API response');
     }
 
-    console.log('=== 解析されたJSONオブジェクト ===');
-    console.log(parsedJSON);
-
-    let travelPlan = parsedJSON;
-    // 基本的な構造の検証
-    if (!travelPlan.trip_id || !travelPlan.theme || !travelPlan.hero || !travelPlan.itinerary || !Array.isArray(travelPlan.itinerary)) {
-      throw new Error('Invalid travel plan structure');
+    let travelPlans = parsedJSON;
+    
+    // プラン形式の基本構造検証
+    if (!travelPlans.plans || !Array.isArray(travelPlans.plans)) {
+      throw new Error('Invalid travel plans structure - missing plans array');
     }
     
-    return NextResponse.json(travelPlan);
+    if (travelPlans.plans.length !== 3) {
+      throw new Error(`Expected 3 travel plans, but got ${travelPlans.plans.length}`);
+    }
+    
+    // 各プランの構造検証
+    travelPlans.plans.forEach((plan, index) => {
+      if (!plan.trip_id || !plan.theme || !plan.hero || !plan.itinerary || !Array.isArray(plan.itinerary)) {
+        throw new Error(`Invalid structure in plan ${index + 1}`);
+      }
+    });
+    
+    return NextResponse.json(travelPlans);
     
   } catch (error) {
     console.error('Error generating travel plan:', error);
