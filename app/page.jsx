@@ -17,7 +17,7 @@ export default function Home() {
   const [formData, setFormData] = useState({
     destination: "",
     people: 2,
-    budget: 50000,
+    budget: "", // デフォルトを空文字列に変更
     interests: [],
     startDate: "",
     endDate: ""
@@ -58,10 +58,16 @@ export default function Home() {
     return considerations[season] || '';
   };
 
-  // 日付の妥当性チェック
+  // 日付の妥当性チェック（日程が入力されている場合のみ）
   const validateDates = () => {
+    // 日程が両方とも空の場合は妥当とみなす
+    if (!formData.startDate && !formData.endDate) {
+      return null;
+    }
+    
+    // 片方だけ入力されている場合はエラー
     if (!formData.startDate || !formData.endDate) {
-      return "出発日と帰着日を入力してください";
+      return "出発日と帰着日を両方入力するか、両方とも空にしてください";
     }
     
     const start = new Date(formData.startDate);
@@ -122,15 +128,15 @@ export default function Home() {
       // フォームデータを適切な形式に変換
       const requestData = {
         destination: formData.destination,
-        duration: duration,
-        budget: `${formData.budget.toLocaleString()}円`,
+        duration: formData.startDate && formData.endDate ? duration : null,
+        budget: formData.budget ? `¥${parseInt(formData.budget).toLocaleString()}` : null,
         number_of_people: `${formData.people}人`,
         interests: formData.interests.map(id => interests.find(i => i.id === id)?.label).filter(Boolean).join(', '),
-        date: `${formatDate(startDate)}から${formatDate(endDate)}`,
-        season: season,
-        seasonal_considerations: seasonalConsiderations,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
+        date: formData.startDate && formData.endDate ? `${formatDate(startDate)}から${formatDate(endDate)}` : null,
+        season: formData.startDate ? season : null,
+        seasonal_considerations: formData.startDate ? seasonalConsiderations : null,
+        startDate: formData.startDate || null,
+        endDate: formData.endDate || null,
         additional_requests: '',
         participants: []
       };
@@ -268,7 +274,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
               旅行の希望を教えてください
             </h2>
-            <p className="text-lg text-gray-600">
+            <p className="text-lg text-gray-600 mb-2">
               数分で、あなただけの特別な旅程を作成します
             </p>
           </div>
@@ -304,7 +310,6 @@ export default function Home() {
                 </label>
                 <input
                   type="date"
-                  required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   value={formData.startDate}
                   onChange={(e) => setFormData({...formData, startDate: e.target.value})}
@@ -317,7 +322,6 @@ export default function Home() {
                 </label>
                 <input
                   type="date"
-                  required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   value={formData.endDate}
                   onChange={(e) => setFormData({...formData, endDate: e.target.value})}
@@ -352,8 +356,9 @@ export default function Home() {
               <select
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={formData.budget}
-                onChange={(e) => setFormData({...formData, budget: parseInt(e.target.value)})}
+                onChange={(e) => setFormData({...formData, budget: e.target.value})}
               >
+                <option value="">予算を選択してください（未選択も可）</option>
                 <option value={20000}>〜¥20,000</option>
                 <option value={30000}>¥20,000 - ¥30,000</option>
                 <option value={50000}>¥30,000 - ¥50,000</option>

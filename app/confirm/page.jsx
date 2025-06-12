@@ -80,7 +80,16 @@ export default function ConfirmPage() {
                   </div>
                 </div>
               ) : (
-                <div className="text-gray-600">{plan.hero.duration}</div>
+                <div className="text-gray-600">
+                  <div className="font-medium">
+                    {plan.hero.duration}
+                  </div>
+                  {plan.itinerary && plan.itinerary.length > 0 && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {plan.itinerary.length}日間のプラン
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">

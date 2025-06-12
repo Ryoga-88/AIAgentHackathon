@@ -7,6 +7,7 @@ import InteractiveMap from "../../components/InteractiveMap";
 import { useAuth } from "../../contexts/AuthContext";
 import UserProfile from "../../components/Auth/UserProfile";
 import BlurredContent from "../../components/BlurredContent";
+import ProgressModalDynamic from "../../components/ProgressModalDynamic";
 
 export default function PlansPage() {
   const router = useRouter();
@@ -29,6 +30,11 @@ export default function PlansPage() {
   const [endDate, setEndDate] = useState('');
   const [showRegenerateForm, setShowRegenerateForm] = useState(false);
   const [additionalPrompt, setAdditionalPrompt] = useState('');
+  const [people, setPeople] = useState(2);
+  
+  // 進捗モーダル用の状態
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenerationProgress, setRegenerationProgress] = useState(0);
 
   // クライアントサイドレンダリングの確認とプランデータの存在確認
   useEffect(() => {
@@ -128,89 +134,80 @@ export default function PlansPage() {
           setLocationData({});
         }
 
-        // 各プランの主要都市でホテルを並行検索（パフォーマンス改善）
-        const hotelPromises = plans.filter(plan => plan && plan.hero && plan.hero.title).map(async (plan) => {
-          const mainDestination = plan.hero.title;
-          const locationData = locationResults[mainDestination];
+        // 各プランの日毎にホテルを検索（改善版）
+        const hotelPromises = [];
+        const hotelResults = {};
+        
+        for (const plan of plans.filter(plan => plan && plan.itinerary && Array.isArray(plan.itinerary))) {
+          hotelResults[plan.trip_id] = {};
           
-          // 日程の設定（今日から1週間後〜3日間の滞在）
-          const today = new Date();
-          const checkin = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000); // 1週間後
-          const checkout = new Date(checkin.getTime() + 3 * 24 * 60 * 60 * 1000); // 3日間の滞在
-          
-          const checkinStr = checkin.toISOString().split('T')[0];
-          const checkoutStr = checkout.toISOString().split('T')[0];
-          
-          if (locationData && locationData.coordinates) {
-            try {
-              console.log(`ホテル検索中: ${mainDestination}`, {
-                coordinates: locationData.coordinates,
-                checkin: checkinStr,
-                checkout: checkoutStr
-              });
+          for (const day of plan.itinerary) {
+            // 最終日以外の日でホテル検索
+            if (day.accommodation && day.accommodation !== "出発日のため宿泊なし") {
+              const accommodationLocation = day.accommodation;
+              const dayNumber = day.day;
               
-              const hotelResponse = await fetch('/api/search-hotels', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  checkin: checkinStr,
-                  checkout: checkoutStr,
-                  adults: 2,
-                  searchType: 'coordinates',
-                  coordinates: locationData.coordinates
-                }),
-              });
+              // チェックイン日とチェックアウト日を設定
+              const today = new Date();
+              const checkinDate = new Date(today.getTime() + (7 + dayNumber - 1) * 24 * 60 * 60 * 1000);
+              const checkoutDate = new Date(checkinDate.getTime() + 24 * 60 * 60 * 1000);
+              
+              const checkinStr = checkinDate.toISOString().split('T')[0];
+              const checkoutStr = checkoutDate.toISOString().split('T')[0];
+              
+              const promise = (async () => {
+                try {
+                  console.log(`Day ${dayNumber} ホテル検索: ${accommodationLocation}`, {
+                    checkin: checkinStr,
+                    checkout: checkoutStr
+                  });
+                  
+                  const hotelResponse = await fetch('/api/search-hotels', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      checkin: checkinStr,
+                      checkout: checkoutStr,
+                      adults: 2,
+                      searchType: 'location',
+                      location: accommodationLocation
+                    }),
+                  });
 
-              if (hotelResponse.ok) {
-                const hotelData = await hotelResponse.json();
-                console.log(`ホテル検索成功 (${mainDestination}):`, hotelData);
-                return { trip_id: plan.trip_id, results: hotelData.results };
-              } else {
-                console.error(`ホテル検索失敗 (${mainDestination}):`, hotelResponse.status);
-              }
-            } catch (error) {
-              console.error(`ホテル検索エラー (${plan.trip_id}):`, error);
-            }
-          } else {
-            // 座標がない場合は地名で検索
-            try {
-              console.log(`ホテル検索（地名）: ${mainDestination}`);
-              const hotelResponse = await fetch('/api/search-hotels', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  checkin: checkinStr,
-                  checkout: checkoutStr,
-                  adults: 2,
-                  searchType: 'location',
-                  location: mainDestination
-                }),
-              });
-
-              if (hotelResponse.ok) {
-                const hotelData = await hotelResponse.json();
-                console.log(`ホテル検索成功（地名）(${mainDestination}):`, hotelData);
-                return { trip_id: plan.trip_id, results: hotelData.results };
-              }
-            } catch (error) {
-              console.error(`ホテル検索エラー（地名）(${plan.trip_id}):`, error);
+                  if (hotelResponse.ok) {
+                    const hotelData = await hotelResponse.json();
+                    console.log(`Day ${dayNumber} ホテル検索成功:`, hotelData);
+                    return { 
+                      trip_id: plan.trip_id, 
+                      day: dayNumber,
+                      results: hotelData.results || []
+                    };
+                  } else {
+                    console.error(`Day ${dayNumber} ホテル検索失敗:`, hotelResponse.status);
+                  }
+                } catch (error) {
+                  console.error(`Day ${dayNumber} ホテル検索エラー:`, error);
+                }
+                return { trip_id: plan.trip_id, day: dayNumber, results: [] };
+              })();
+              
+              hotelPromises.push(promise);
             }
           }
-          return { trip_id: plan.trip_id, results: [] };
-        });
+        }
 
-        // ホテル情報を設定
+        // ホテル情報を設定（日毎）
         try {
-          const hotelResults = {};
           const hotelResponses = await Promise.all(hotelPromises);
           hotelResponses.forEach(response => {
-            hotelResults[response.trip_id] = response.results;
+            if (!hotelResults[response.trip_id]) {
+              hotelResults[response.trip_id] = {};
+            }
+            hotelResults[response.trip_id][`day_${response.day}`] = response.results;
           });
-          console.log('ホテル検索結果:', hotelResults);
+          console.log('日毎ホテル検索結果:', hotelResults);
           setHotels(hotelResults);
         } catch (error) {
           console.error('ホテル情報取得に失敗:', error);
@@ -367,6 +364,10 @@ export default function PlansPage() {
           const dayImageResponses = await Promise.all(dayImagePromises);
           dayImageResponses.forEach(response => {
             if (response) {
+              if (!dayImageResults[response.trip_id]) {
+                dayImageResults[response.trip_id] = {};
+              }
+              // 修正: day番号で直接保存
               dayImageResults[response.trip_id][response.day] = response.data;
             }
           });
@@ -453,7 +454,6 @@ export default function PlansPage() {
               .then(async (response) => {
                 if (response.ok) {
                   const routeData = await response.json();
-                  console.log(`Day ${day.day} ルート取得成功 (${plan.trip_id}):`, routeData);
                   return { trip_id: plan.trip_id, type: `day_${day.day}`, data: routeData };
                 }
                 console.error(`Day ${day.day} ルート取得失敗 (${plan.trip_id}):`, response.status);
@@ -484,6 +484,474 @@ export default function PlansPage() {
           // エラーが発生してもアプリケーションを継続
           setRouteData({});
         }
+        setLoading(false);
+      } catch (error) {
+        console.error('データ取得エラー:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [plans]);
+
+  const fetchHotels = async (tripId, planData) => {
+    try {
+      if (!planData?.itinerary) return;
+
+      const hotelPromises = planData.itinerary.map(async (day) => {
+        if (!day.accommodation || day.accommodation === "出発日のため宿泊なし") {
+          return null;
+        }
+
+        try {
+          // 楽天トラベルAPIを使用してホテル検索
+          const response = await fetch('/api/hotels', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              location: day.accommodation,
+              checkin: day.day === 1 ? startDate : null,
+              checkout: day.day === planData.itinerary.length ? endDate : null,
+              adults: people || 2,
+              roomCount: 1
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`ホテル検索エラー: ${response.status}`);
+          }
+
+          const hotelData = await response.json();
+          return {
+            dayKey: `day_${day.day}`,
+            hotels: hotelData.hotels || []
+          };
+        } catch (error) {
+          console.error(`Day ${day.day}のホテル検索エラー:`, error);
+          return {
+            dayKey: `day_${day.day}`,
+            hotels: []
+          };
+        }
+      });
+
+      const hotelResults = await Promise.all(hotelPromises);
+      const hotelsByDay = {};
+
+      hotelResults.forEach(result => {
+        if (result) {
+          hotelsByDay[result.dayKey] = result.hotels;
+        }
+      });
+
+      setHotels(prev => ({
+        ...prev,
+        [tripId]: hotelsByDay
+      }));
+    } catch (error) {
+      console.error('ホテル検索の全体エラー:', error);
+    }
+  };
+
+  // fetchRoutes関数の修正
+  const fetchDetailedRoutes = async (tripId, planData) => {
+    try {
+      if (!planData?.itinerary) return;
+
+      console.log(`=== 詳細経路探索開始: ${tripId} ===`);
+      
+      const allRouteSegments = {};
+      const routePromises = [];
+      const totalDistanceTracker = { total: 0 };
+
+      // 各日の詳細経路を取得
+      for (const day of planData.itinerary) {
+        // day.activitiesが存在しない場合はスキップ
+        if (!day.activities || !Array.isArray(day.activities)) {
+          console.warn(`Day ${day.day}: activitiesが存在しないか、配列ではありません`, day);
+          continue;
+        }
+
+        const dayKey = `day_${day.day}`;
+        console.log(`\n--- Day ${day.day} 開始 ---`);
+        
+        allRouteSegments[dayKey] = {
+          segments: [],
+          dayTotalDistance: 0,
+          dayTotalDuration: 0,
+          crossDaySegment: null
+        };
+
+        // その日のアクティビティ（search_queryがあるもののみ）
+        const dayActivities = day.activities.filter(activity => 
+          activity && activity.search_query && activity.search_query.trim() !== ''
+        );
+
+        console.log(`Day ${day.day} 全アクティビティ:`, day.activities.map(a => ({
+          title: a?.title || '不明', 
+          search_query: a?.search_query || 'なし'
+        })));
+        console.log(`Day ${day.day} 有効なアクティビティ:`, dayActivities.map(a => a.title));
+
+        // 前日の最後のアクティビティから今日の最初のアクティビティへの移動（日跨ぎ）
+        if (day.day > 1 && dayActivities.length > 0) {
+          const previousDay = planData.itinerary.find(d => d.day === day.day - 1);
+          if (previousDay && previousDay.activities && Array.isArray(previousDay.activities)) {
+            const previousDayActivities = previousDay.activities.filter(activity => 
+              activity && activity.search_query && activity.search_query.trim() !== ''
+            );
+            
+            if (previousDayActivities.length > 0) {
+              const lastActivityPrevDay = previousDayActivities[previousDayActivities.length - 1];
+              const firstActivityToday = dayActivities[0];
+              
+              console.log(`🌅 日跨ぎ移動設定: ${lastActivityPrevDay.title} → ${firstActivityToday.title}`);
+              
+              // 日跨ぎの経路を取得
+              const crossDayPromise = fetchSingleRouteSegment(
+                {
+                  type: 'activity',
+                  name: lastActivityPrevDay.location || lastActivityPrevDay.title,
+                  searchQuery: lastActivityPrevDay.search_query,
+                  id: lastActivityPrevDay.id,
+                  title: lastActivityPrevDay.title
+                },
+                {
+                  type: 'activity',
+                  name: firstActivityToday.location || firstActivityToday.title,
+                  searchQuery: firstActivityToday.search_query,
+                  id: firstActivityToday.id,
+                  title: firstActivityToday.title
+                },
+                day.day,
+                'cross_day',
+                tripId,
+                totalDistanceTracker
+              );
+              
+              routePromises.push(crossDayPromise);
+            } else {
+              console.log(`⚠️ Day ${day.day - 1} に有効なアクティビティがないため、日跨ぎ移動をスキップ`);
+            }
+          }
+        }
+        
+        // その日のアクティビティ間の移動
+        for (let i = 0; i < dayActivities.length - 1; i++) {
+          const fromActivity = dayActivities[i];
+          const toActivity = dayActivities[i + 1];
+          
+          console.log(`🚗 Day ${day.day} 移動 ${i + 1}: ${fromActivity.title} → ${toActivity.title}`);
+          
+          const segmentPromise = fetchSingleRouteSegment(
+            {
+              type: 'activity',
+              name: fromActivity.location || fromActivity.title,
+              searchQuery: fromActivity.search_query,
+              id: fromActivity.id,
+              title: fromActivity.title
+            },
+            {
+              type: 'activity',
+              name: toActivity.location || toActivity.title,
+              searchQuery: toActivity.search_query,
+              id: toActivity.id,
+              title: toActivity.title
+            },
+            day.day,
+            i,
+            tripId,
+            totalDistanceTracker
+          );
+          
+          routePromises.push(segmentPromise);
+        }
+      }
+
+      // 全ての経路セグメントを並行取得
+      console.log(`\n📊 総経路セグメント数: ${routePromises.length}`);
+      
+      if (routePromises.length === 0) {
+        console.log('⚠️ 経路セグメントがありません。経路データの設定をスキップします。');
+        return;
+      }
+      
+      const routeResults = await Promise.all(routePromises);
+      
+      // 結果を整理
+      console.log(`\n=== 経路結果の整理 ===`);
+      routeResults.forEach((result, index) => {
+        console.log(`結果 ${index + 1}:`, {
+          success: result?.success,
+          day: result?.day,
+          segmentIndex: result?.segmentIndex,
+          distance: result?.data?.distance_km,
+          duration: result?.data?.duration_minutes
+        });
+        
+        if (result && result.success) {
+          const dayKey = `day_${result.day}`;
+          if (!allRouteSegments[dayKey]) {
+            allRouteSegments[dayKey] = { 
+              segments: [], 
+              dayTotalDistance: 0, 
+              dayTotalDuration: 0, 
+              crossDaySegment: null 
+            };
+          }
+          
+          if (result.segmentIndex === 'cross_day') {
+            // 日跨ぎセグメント
+            allRouteSegments[dayKey].crossDaySegment = result.data;
+            console.log(`✅ 日跨ぎセグメント設定: Day ${result.day}`, {
+              from: result.data.from.title,
+              to: result.data.to.title,
+              distance: result.data.distance_km,
+              duration: result.data.duration_minutes
+            });
+          } else {
+            // 通常のセグメント
+            allRouteSegments[dayKey].segments.push(result.data);
+          }
+          
+          allRouteSegments[dayKey].dayTotalDistance += result.data.distance_km || 0;
+          allRouteSegments[dayKey].dayTotalDuration += result.data.duration_minutes || 0;
+        } else {
+          console.error('❌ 経路取得失敗:', result);
+        }
+      });
+
+      // 全体の総移動距離と交通費を計算
+      const totalDistance = totalDistanceTracker.total;
+      const totalDuration = Object.values(allRouteSegments).reduce((total, day) => total + day.dayTotalDuration, 0);
+      const totalTransportationCost = Math.round(totalDistance * 28);
+
+      console.log(`\n=== 最終結果 ===`);
+      console.log(`総移動距離: ${Math.round(totalDistance * 10) / 10} km`);
+      console.log(`総移動時間: ${totalDuration} 分`);
+      console.log(`総交通費: ¥${totalTransportationCost.toLocaleString()}`);
+
+      // 各日の詳細ログ
+      Object.keys(allRouteSegments).forEach(dayKey => {
+        const dayData = allRouteSegments[dayKey];
+        console.log(`${dayKey}:`, {
+          segments: dayData.segments.length,
+          crossDay: !!dayData.crossDaySegment,
+          totalDistance: Math.round(dayData.dayTotalDistance * 10) / 10,
+          totalDuration: dayData.dayTotalDuration
+        });
+      });
+
+      // 全体ルート情報を設定
+      const finalRouteData = {
+        ...allRouteSegments,
+        overall: {
+          route: {
+            distance_km: totalDistance,
+            duration_minutes: totalDuration,
+            mode: 'driving',
+            total_cost: totalTransportationCost
+          }
+        }
+      };
+
+      console.log(`\n📤 setRouteData に設定するデータ:`, finalRouteData);
+
+      setRouteData(prev => ({
+        ...prev,
+        [tripId]: finalRouteData
+      }));
+
+    } catch (error) {
+      console.error('❌ 詳細経路探索エラー:', error);
+    }
+  };
+
+  // 単一の経路セグメントを取得（総距離追跡機能付き）
+  const fetchSingleRouteSegment = async (from, to, day, segmentIndex, tripId, totalDistanceTracker) => {
+    try {
+      console.log(`経路セグメント取得: Day ${day}, ${from.name} → ${to.name}`);
+
+      const response = await fetch('/api/directions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          origin: from.searchQuery,
+          destination: to.searchQuery,
+          mode: 'driving'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`経路取得エラー: ${response.status}`);
+      }
+
+      const routeData = await response.json();
+      const distance = routeData.distance_km || 0;
+      
+      // 総距離に追加
+      totalDistanceTracker.total += distance;
+      
+      return {
+        success: true,
+        day: day,
+        segmentIndex: segmentIndex,
+        tripId: tripId,
+        data: {
+          from: from,
+          to: to,
+          distance_km: distance,
+          duration_minutes: routeData.duration_minutes || 0,
+          polyline: routeData.polyline || '',
+          static_map_url: routeData.static_map_url || '',
+          directions: routeData.directions || [],
+          is_cross_day: segmentIndex === 'cross_day'
+        }
+      };
+    } catch (error) {
+      console.error(`経路セグメント取得エラー (Day ${day}, ${from.name} → ${to.name}):`, error);
+      return {
+        success: false,
+        day: day,
+        segmentIndex: segmentIndex,
+        error: error.message
+      };
+    }
+  };
+
+  // 各日の統合マップを生成
+  const generateDayMaps = async (tripId, planData, routeSegments) => {
+    try {
+      for (const day of planData.itinerary) {
+        const dayKey = `day_${day.day}`;
+        const daySegments = routeSegments[dayKey];
+        
+        if (!daySegments || daySegments.segments.length === 0) {
+          console.log(`Day ${day.day}: 経路セグメントなし`);
+          continue;
+        }
+
+        // その日のすべてのポイントを収集
+        const allPoints = [];
+        const allPolylines = [];
+
+        daySegments.segments.forEach(segment => {
+          if (!allPoints.some(p => p.name === segment.from.name)) {
+            allPoints.push(segment.from);
+          }
+          if (!allPoints.some(p => p.name === segment.to.name)) {
+            allPoints.push(segment.to);
+          }
+          if (segment.polyline) {
+            allPolylines.push(segment.polyline);
+          }
+        });
+
+        // 統合マップを生成
+        try {
+          const mapResponse = await fetch('/api/generate-day-map', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              waypoints: allPoints.map(p => p.searchQuery),
+              polylines: allPolylines,
+              day: day.day
+            }),
+          });
+
+          if (mapResponse.ok) {
+            const mapData = await mapResponse.json();
+            
+            // 既存のrouteDataを更新
+            setRouteData(prev => ({
+              ...prev,
+              [tripId]: {
+                ...prev[tripId],
+                [dayKey]: {
+                  segments: daySegments.segments,
+                  route: {
+                    distance_km: daySegments.totalDistance,
+                    duration_minutes: daySegments.totalDuration,
+                    mode: 'driving'
+                  },
+                  static_map_url: mapData.static_map_url
+                }
+              }
+            }));
+          }
+        } catch (error) {
+          console.error(`Day ${day.day} マップ生成エラー:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('日別マップ生成エラー:', error);
+    }
+  };
+
+  // 全体ルートを生成
+  const generateOverallRoute = async (tripId, planData) => {
+    try {
+      const majorPoints = planData.itinerary.map(day => ({
+        name: day.city?.name || day.accommodation,
+        searchQuery: day.city?.name || day.accommodation
+      })).filter(point => point.searchQuery);
+
+      if (majorPoints.length < 2) return;
+
+      const response = await fetch('/api/directions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          waypoints: majorPoints.map(p => p.searchQuery),
+          optimize: false // 日程順序を維持
+        }),
+      });
+
+      if (response.ok) {
+        const overallData = await response.json();
+        
+        setRouteData(prev => ({
+          ...prev,
+          [tripId]: {
+            ...prev[tripId],
+            overall: {
+              route: {
+                distance_km: overallData.distance_km,
+                duration_minutes: overallData.duration_minutes,
+                mode: 'driving'
+              },
+              static_map_url: overallData.static_map_url
+            }
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('全体ルート生成エラー:', error);
+    }
+  };
+
+  // 既存のuseEffectの経路取得部分を置き換え
+  useEffect(() => {
+    if (plans.length === 0 || !isClient) return;
+
+    const fetchData = async () => {
+      try {
+        // 位置情報とホテル情報の取得
+        // ... 既存のホテル・画像取得コード ...
+
+        // 詳細経路情報を取得（新しい実装）
+        for (const plan of plans) {
+          await fetchDetailedRoutes(plan.trip_id, plan);
+        }
+
         setLoading(false);
       } catch (error) {
         console.error('データ取得エラー:', error);
@@ -566,8 +1034,31 @@ export default function PlansPage() {
       return;
     }
 
+    setShowRegenerateForm(false);
+    setIsRegenerating(true);
+    setRegenerationProgress(0);
+
+    let progressInterval;
+
     try {
-      // 現在のプランデータと追加プロンプトを組み合わせて新しいプランを生成
+      console.log('=== プラン修正開始 ===');
+      console.log('選択されたプラン:', selectedPlan);
+      console.log('元のプラン ID:', selectedPlanData?.trip_id);
+      console.log('修正要望:', additionalPrompt);
+
+      // 進捗シミュレーション
+      progressInterval = setInterval(() => {
+        setRegenerationProgress(prev => {
+          if (prev >= 95) {
+            clearInterval(progressInterval);
+            return 95;
+          }
+          const increment = prev < 30 ? 8 : prev < 60 ? 5 : prev < 80 ? 3 : 1;
+          return prev + increment;
+        });
+      }, 800);
+
+      // API呼び出し
       const response = await fetch('/api/modify-travel-plan', {
         method: 'POST',
         headers: {
@@ -576,26 +1067,168 @@ export default function PlansPage() {
         body: JSON.stringify({
           original_plan: selectedPlanData,
           plan_number: selectedPlan + 1,
-          modification_request: additionalPrompt,
+          modification_request: additionalPrompt.trim(),
           full_plans_data: plans
         }),
       });
 
+      console.log('=== APIレスポンス ===');
+      console.log('Status:', response.status);
+      console.log('Status Text:', response.statusText);
+      console.log('OK:', response.ok);
+
+      // 進捗を100%に
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+      setRegenerationProgress(100);
+
+      // レスポンステキストを取得
+      const responseText = await response.text();
+      console.log('=== レスポンステキスト ===');
+      console.log('Length:', responseText.length);
+      console.log('Preview:', responseText.substring(0, 500));
+
       if (response.ok) {
-        const newPlans = await response.json();
-        localStorage.setItem('travelPlans', JSON.stringify(newPlans));
-        // ページをリロードして新しいプランを表示
-        window.location.reload();
+        let responseData;
+        try {
+          responseData = JSON.parse(responseText);
+          console.log('=== JSONパース成功 ===');
+          console.log('Response keys:', Object.keys(responseData));
+          console.log('Success flag:', responseData.success);
+        } catch (parseError) {
+          console.error('=== JSONパースエラー ===', parseError);
+          console.error('Raw response:', responseText);
+          throw new Error('サーバーからの応答が無効なJSON形式です');
+        }
+        
+        // APIレスポンス形式に合わせた検証
+        if (!responseData.success) {
+          throw new Error('プランの修正に失敗しました');
+        }
+
+        if (!responseData.modified_plan) {
+          throw new Error('修正されたプランデータが返されませんでした');
+        }
+
+        const modifiedPlan = responseData.modified_plan;
+        
+        // プランデータの基本検証
+        if (!modifiedPlan.trip_id) {
+          console.warn('Trip IDが不足しているため、自動生成します');
+          modifiedPlan.trip_id = `modified_${selectedPlanData.trip_id}_${Date.now()}`;
+        }
+
+        if (!modifiedPlan.hero) {
+          console.warn('Hero情報が不足しているため、元のデータを使用します');
+          modifiedPlan.hero = selectedPlanData.hero;
+        }
+
+        if (!modifiedPlan.itinerary || !Array.isArray(modifiedPlan.itinerary)) {
+          console.warn('Itinerary情報が不足しているため、元のデータを使用します');
+          modifiedPlan.itinerary = selectedPlanData.itinerary;
+        }
+
+        console.log('=== 修正されたプラン ===');
+        console.log('Trip ID:', modifiedPlan.trip_id);
+        console.log('Title:', modifiedPlan.hero?.title);
+        console.log('Days:', modifiedPlan.itinerary?.length);
+        console.log('Summary:', modifiedPlan.modification_summary);
+
+        // 既存のプラン配列を更新（選択されたプランのみを置き換え）
+        const updatedPlans = [...plans];
+        updatedPlans[selectedPlan] = modifiedPlan;
+        
+        console.log('=== プラン配列更新 ===');
+        console.log('更新前プラン数:', plans.length);
+        console.log('更新後プラン数:', updatedPlans.length);
+        console.log('修正対象インデックス:', selectedPlan);
+
+        // ローカルストレージに保存
+        localStorage.setItem('travelPlans', JSON.stringify(updatedPlans));
+        
+        // 完了処理
+        setTimeout(() => {
+          setPlans(updatedPlans);
+          setSelectedPlan(selectedPlan); // 同じプランを再選択
+          setIsRegenerating(false);
+          setRegenerationProgress(0);
+          
+          const planTitle = modifiedPlan.hero?.title || `プラン ${selectedPlan + 1}`;
+          const summary = modifiedPlan.modification_summary || '要望に基づいて更新されました';
+          
+          alert(`✅ プラン修正完了\n\n「${planTitle}」\n\n修正内容: ${summary}`);
+        }, 1000);
+        
       } else {
-        alert('プランの生成に失敗しました。もう一度お試しください。');
+        // エラーレスポンスの処理
+        console.error('=== APIエラー ===');
+        console.error('Status:', response.status);
+        console.error('Response:', responseText);
+        
+        let errorMessage = 'プランの修正に失敗しました。';
+        
+        try {
+          const errorData = JSON.parse(responseText);
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+          if (errorData.details) {
+            console.error('Error details:', errorData.details);
+            errorMessage += `\n詳細: ${errorData.details}`;
+          }
+        } catch {
+          // JSON パースに失敗した場合のエラーハンドリング
+          if (response.status === 429) {
+            errorMessage = 'リクエストが多すぎます。しばらく待ってから再試行してください。';
+          } else if (response.status === 401) {
+            errorMessage = 'API認証エラーが発生しました。管理者にお問い合わせください。';
+          } else if (response.status === 500) {
+            errorMessage = 'サーバー内部エラーが発生しました。しばらく待ってから再試行してください。';
+          } else {
+            errorMessage += ` (HTTP ${response.status})`;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
     } catch (error) {
-      console.error('プラン再生成エラー:', error);
-      alert('プランの生成中にエラーが発生しました。');
+      console.error('=== プラン修正エラー (全体) ===', error);
+      
+      let userMessage = 'プランの修正中にエラーが発生しました。';
+      
+      if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+        userMessage = 'ネットワーク接続に問題があります。インターネット接続を確認してください。';
+      } else if (error.message.includes('JSON') || error.message.includes('parse')) {
+        userMessage = 'サーバーからの応答形式に問題があります。しばらく待ってから再試行してください。';
+      } else if (error.message.includes('API認証')) {
+        userMessage = 'サービスの認証に問題があります。管理者にお問い合わせください。';
+      } else if (error.message.includes('リクエストが多すぎます')) {
+        userMessage = 'リクエストが多すぎます。1分ほど待ってから再試行してください。';
+      } else if (error.message.includes('サーバー内部エラー')) {
+        userMessage = 'サーバーで問題が発生しています。しばらく待ってから再試行してください。';
+      } else if (error.message) {
+        userMessage = error.message;
+      }
+      
+      alert(`❌ エラー\n\n${userMessage}`);
+    } finally {
+      // 確実にクリーンアップ
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+      setIsRegenerating(false);
+      setRegenerationProgress(0);
+      setAdditionalPrompt('');
     }
+  };
 
-    setShowRegenerateForm(false);
-    setAdditionalPrompt('');
+  // キャンセル処理
+  const handleRegenerationCancel = () => {
+    setIsRegenerating(false);
+    setRegenerationProgress(0);
+    setShowRegenerateForm(true);
   };
 
   if (loading) {
@@ -632,6 +1265,16 @@ export default function PlansPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* 進捗モーダル */}
+      <ProgressModalDynamic 
+        isVisible={isRegenerating}
+        progress={regenerationProgress}
+        totalPlans={1}
+        onCancel={handleRegenerationCancel}
+        customTitle="プランをカスタマイズ中..."
+        customSubtitle="あなたの要望を反映した新しいプランを生成しています"
+      />
+
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -704,7 +1347,17 @@ export default function PlansPage() {
                 
                 <div className="p-4">
                   <div className="flex justify-between items-center mb-3">
-                    <span className="text-blue-600 font-semibold">{plan.hero?.duration || '期間未設定'}</span>
+                    <span className="text-blue-600 font-semibold">
+                      {(() => {
+                        if (plan.hero?.duration) {
+                          return plan.hero.duration;
+                        } else if (plan.itinerary && plan.itinerary.length > 0) {
+                          return `${plan.itinerary.length}日間`;
+                        } else {
+                          return '期間未設定';
+                        }
+                      })()}
+                    </span>
                     <span className="text-purple-600 font-semibold">{plan.hero?.budget || '予算未設定'}</span>
                   </div>
                   
@@ -740,7 +1393,7 @@ export default function PlansPage() {
         </div>
 
         {/* Selected Plan Details */}
-        {selectedPlanData && (
+        {selectedPlanData && !isRegenerating && (
           <BlurredContent isAuthenticated={!!currentUser} title="詳細なプラン">
             <div className="lg:grid lg:grid-cols-3 lg:gap-8">
               {/* Main Content */}
@@ -836,7 +1489,7 @@ export default function PlansPage() {
                       </div>
 
                       {/* 1日の経路マップ */}
-                      {routeData[selectedPlanData.trip_id]?.[`day_${day.day}`] && (
+                      {routeData[selectedPlanData.trip_id]?.[`day_${day.day}`] ? (
                         <div className="mt-4">
                           <h5 className="font-medium text-gray-900 mb-2 flex items-center">
                             <span className="mr-2">🗺️</span>
@@ -844,9 +1497,97 @@ export default function PlansPage() {
                           </h5>
                           <InteractiveMap
                             staticMapUrl={routeData[selectedPlanData.trip_id][`day_${day.day}`].static_map_url}
-                            routeInfo={routeData[selectedPlanData.trip_id][`day_${day.day}`].route}
+                            routeInfo={routeData[selectedPlanData.trip_id][`day_${day.day}`]}
                             height="250px"
                           />
+                        </div>
+                      ) : (
+                        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <div className="flex items-center">
+                            <span className="text-yellow-600 mr-2">⚠️</span>
+                            <div>
+                              <p className="text-yellow-800 font-medium">Day {day.day} の経路情報を取得中</p>
+                              <p className="text-yellow-700 text-sm">
+                                {day.activities.length > 0 ? 
+                                  `${day.activities.length}箇所のスポット間の最適ルートを計算しています...` :
+                                  'このエリアの移動情報を準備中です...'
+                                }
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 当日の宿泊先 */}
+                      {day.accommodation && day.accommodation !== "出発日のため宿泊なし" && (
+                        <div className="mt-6">
+                          <h5 className="font-medium text-gray-900 mb-3 flex items-center">
+                            <span className="mr-2">🏨</span>
+                            Day {day.day} の宿泊先
+                          </h5>
+                          {hotels[selectedPlanData.trip_id]?.[`day_${day.day}`] && hotels[selectedPlanData.trip_id][`day_${day.day}`].length > 0 ? (
+                            <div className="space-y-3">
+                              {hotels[selectedPlanData.trip_id][`day_${day.day}`].slice(0, 2).map((hotel, hotelIndex) => (
+                                <div key={hotelIndex} className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                                  <div className="flex items-start space-x-3">
+                                    <img
+                                      src={hotel.image}
+                                      alt={hotel.name}
+                                      className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <h6 className="font-semibold text-gray-900 text-sm mb-1">{hotel.name}</h6>
+                                      <p className="text-xs text-gray-600 mb-2 flex items-center">
+                                        <span className="mr-1">📍</span>
+                                        {hotel.location}
+                                      </p>
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                          <div className="flex text-yellow-400 text-xs">
+                                            {[...Array(5)].map((_, i) => (
+                                              <span key={i} className={i < Math.floor(hotel.rating) ? 'text-yellow-400' : 'text-gray-300'}>
+                                                ⭐
+                                              </span>
+                                            ))}
+                                          </div>
+                                          <span className="text-xs text-gray-600">{hotel.rating}</span>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-sm font-semibold text-blue-600">{hotel.price}</div>
+                                          <a
+                                            href={hotel.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-blue-500 hover:text-blue-700 underline"
+                                          >
+                                            詳細を見る
+                                          </a>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              {hotels[selectedPlanData.trip_id][`day_${day.day}`].length > 2 && (
+                                <p className="text-xs text-gray-500 text-center">
+                                  他に{hotels[selectedPlanData.trip_id][`day_${day.day}`].length - 2}件のホテルがあります
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{day.accommodation}</p>
+                                  <p className="text-xs text-gray-600 mt-1">宿泊エリア</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xs text-gray-500">ホテル情報を検索中...</p>
+                                  <p className="text-sm text-gray-700 mt-1">予算目安: ¥8,000〜</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -870,54 +1611,76 @@ export default function PlansPage() {
                 {/* Recommended Hotels */}
                 <div className="mt-8">
                   <h3 className="text-xl font-semibold text-gray-900 mb-4">おすすめホテル</h3>
-                  {hotels[selectedPlanData.trip_id] && hotels[selectedPlanData.trip_id].length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {hotels[selectedPlanData.trip_id].map((hotel) => (
-                        <div key={hotel.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                          <div className="relative">
-                            <img
-                              src={hotel.image}
-                              alt={hotel.name}
-                              className="w-full h-40 object-cover"
-                            />
-                            <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
-                              ホテル
-                            </div>
-                          </div>
-                          <div className="p-5">
-                            <h4 className="font-bold text-gray-900 mb-2 text-lg leading-tight">{hotel.name}</h4>
-                            <p className="text-sm text-gray-600 mb-3 flex items-center">
-                              <span className="mr-1">📍</span>
-                              {hotel.location}
-                            </p>
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center space-x-1">
-                                <div className="flex text-yellow-400">
-                                  {[...Array(5)].map((_, i) => (
-                                    <span key={i} className={i < Math.floor(hotel.rating) ? 'text-yellow-400' : 'text-gray-300'}>
-                                      ⭐
-                                    </span>
-                                  ))}
+                  {hotels[selectedPlanData.trip_id] && Object.keys(hotels[selectedPlanData.trip_id]).length > 0 ? (
+                    <div className="space-y-6">
+                      {Object.entries(hotels[selectedPlanData.trip_id]).map(([dayKey, dayHotels]) => {
+                        const dayNumber = dayKey.replace('day_', '');
+                        const dayData = selectedPlanData.itinerary.find(d => d.day === parseInt(dayNumber));
+                        
+                        if (!dayHotels || dayHotels.length === 0) return null;
+                        
+                        return (
+                          <div key={dayKey} className="bg-gray-50 rounded-xl p-4">
+                            <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                              <span className="mr-2">🏨</span>
+                              Day {dayNumber} ({dayData?.accommodation}) のホテル
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {dayHotels.slice(0, 6).map((hotel, index) => (
+                                <div key={`${dayKey}-${index}`} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                                  <div className="relative">
+                                    <img
+                                      src={hotel.image}
+                                      alt={hotel.name}
+                                      className="w-full h-32 object-cover"
+                                    />
+                                    <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                                      Day {dayNumber}
+                                    </div>
+                                  </div>
+                                  <div className="p-4">
+                                    <h5 className="font-bold text-gray-900 mb-2 text-sm leading-tight">{hotel.name}</h5>
+                                    <p className="text-xs text-gray-600 mb-2 flex items-center">
+                                      <span className="mr-1">📍</span>
+                                      {hotel.location}
+                                    </p>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="flex items-center space-x-1">
+                                        <div className="flex text-yellow-400 text-xs">
+                                          {[...Array(5)].map((_, i) => (
+                                            <span key={i} className={i < Math.floor(hotel.rating) ? 'text-yellow-400' : 'text-gray-300'}>
+                                              ⭐
+                                            </span>
+                                          ))}
+                                        </div>
+                                        <span className="text-xs text-gray-600">
+                                          {hotel.rating} ({hotel.reviewCount}件)
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm font-bold text-blue-600">{hotel.price}</span>
+                                      <a
+                                        href={hotel.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors duration-200"
+                                      >
+                                        詳細
+                                      </a>
+                                    </div>
+                                  </div>
                                 </div>
-                                <span className="text-sm text-gray-600 ml-1">
-                                  {hotel.rating} ({hotel.reviewCount}件)
-                                </span>
-                              </div>
+                              ))}
                             </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xl font-bold text-blue-600">{hotel.price}</span>
-                              <a
-                                href={hotel.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-                              >
-                                詳細を見る
-                              </a>
-                            </div>
+                            {dayHotels.length > 6 && (
+                              <p className="text-sm text-gray-500 text-center mt-3">
+                                他に{dayHotels.length - 6}件のホテルがあります
+                              </p>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -1011,6 +1774,13 @@ export default function PlansPage() {
                 {/* Plan Summary */}
                 <div className="bg-white rounded-2xl shadow-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 プラン概要</h3>
+                  {!startDate && !endDate && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-700">
+                        💡 日程未設定でも、AIが最適な{selectedPlanData.itinerary ? selectedPlanData.itinerary.length : 0}日間のプランを作成しました
+                      </p>
+                    </div>
+                  )}
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-600">期間</span>
@@ -1036,9 +1806,15 @@ export default function PlansPage() {
                         </div>
                       ) : (
                         <div className="text-right">
-                          <span className="font-medium">{selectedPlanData.hero.duration}</span>
+                          <div className="font-medium text-gray-700">
+                            {selectedPlanData.hero.duration}
+                          </div>
                           <div className="text-xs text-gray-500">
-                            日程未設定
+                            {(() => {
+                              // itineraryの日数から実際の旅行日数を表示
+                              const actualDays = selectedPlanData.itinerary ? selectedPlanData.itinerary.length : 0;
+                              return actualDays > 0 ? `${actualDays}日間のプラン` : '日程未設定';
+                            })()}
                           </div>
                         </div>
                       )}
@@ -1112,6 +1888,13 @@ export default function PlansPage() {
                     </svg>
                   </button>
                 </div>
+
+                {/* Cost Breakdown */}
+                {/* <CostBreakdown 
+                  plan={selectedPlanData}
+                  routeData={routeData[selectedPlanData.trip_id]}
+                  hotels={hotels[selectedPlanData.trip_id]}
+                /> */}
               </div>
             </div>
           </div>
@@ -1176,7 +1959,7 @@ export default function PlansPage() {
         )}
 
         {/* Empty State */}
-        {selectedPlan === null && (
+        {selectedPlan === null && !isRegenerating && (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">🗺️</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">プランを選択してください</h3>
@@ -1187,3 +1970,147 @@ export default function PlansPage() {
     </div>
   );
 }
+
+// 画像取得の関数を修正してフォールバックを改善
+const fetchActivityImages = async (tripId, planData) => {
+  try {
+    const imagePromises = [];
+    
+    for (const day of planData.itinerary) {
+      for (const activity of day.activities) {
+        const imagePromise = fetch('/api/search-images', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query: activity.image_search_term || `${activity.title} ${day.city?.name || ''}`,
+            type: 'activity'
+          }),
+        })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => ({
+          activityId: activity.id,
+          imageUrl: data?.imageUrl || `https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&h=600&fit=crop&crop=center` // デフォルト画像
+        }))
+        .catch(() => ({
+          activityId: activity.id,
+          imageUrl: `https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&h=600&fit=crop&crop=center` // エラー時のデフォルト画像
+        }));
+        
+        imagePromises.push(imagePromise);
+      }
+    }
+    
+    const imageResults = await Promise.all(imagePromises);
+    const imageMap = {};
+    
+    imageResults.forEach(result => {
+      if (result.activityId) {
+        imageMap[result.activityId] = result.imageUrl;
+      }
+    });
+    
+    setActivityImages(prev => ({
+      ...prev,
+      [tripId]: imageMap
+    }));
+    
+  } catch (error) {
+    console.error('アクティビティ画像取得エラー:', error);
+  }
+};
+
+const fetchHeroImages = async (tripId, planData) => {
+  try {
+    const response = await fetch('/api/search-images', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: `${planData.hero?.destination || ''} travel landscape`,
+        type: 'hero'
+      }),
+    });
+    
+    let imageUrl = `https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&h=600&fit=crop&crop=center`; // デフォルト画像
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.imageUrl) {
+        imageUrl = data.imageUrl;
+      }
+    }
+    
+    setHeroImages(prev => ({
+      ...prev,
+      [tripId]: imageUrl
+    }));
+    
+  } catch (error) {
+    console.error('ヒーロー画像取得エラー:', error);
+    // エラー時もデフォルト画像を設定
+    setHeroImages(prev => ({
+      ...prev,
+      [tripId]: `https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&h=600&fit=crop&crop=center`
+    }));
+  }
+};
+
+// fetchDayImages関数の修正
+const fetchDayImages = async (tripId, planData) => {
+  try {
+    const imagePromises = planData.itinerary.map(async (day) => {
+      try {
+        const response = await fetch('/api/search-images', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query: `${day.city?.name || planData.hero?.destination || ''} cityscape`,
+            type: 'city'
+          }),
+        });
+        
+        let imageUrl = `https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&h=600&fit=crop&crop=center`; // デフォルト画像
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data?.imageUrl) {
+            imageUrl = data.imageUrl;
+          }
+        }
+        
+        return {
+          day: day.day,
+          imageUrl: imageUrl
+        };
+      } catch {
+        return {
+          day: day.day,
+          imageUrl: `https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&h=600&fit=crop&crop=center`
+        };
+      }
+    });
+    
+    const imageResults = await Promise.all(imagePromises);
+    const imageMap = {};
+    
+    imageResults.forEach(result => {
+      // 修正: day番号で直接保存
+      imageMap[result.day] = {
+        photo_url: result.imageUrl
+      };
+    });
+    
+    setDayImages(prev => ({
+      ...prev,
+      [tripId]: imageMap
+    }));
+    
+  } catch (error) {
+    console.error('日別画像取得エラー:', error);
+  }
+};

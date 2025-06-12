@@ -244,7 +244,14 @@ export default function PlanDetailPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-600">期間</span>
-                    <span className="font-medium">{plan.hero.duration}</span>
+                    <div className="text-right">
+                      <span className="font-medium">{plan.hero.duration}</span>
+                      {plan.itinerary && plan.itinerary.length > 0 && (
+                        <div className="text-xs text-gray-500">
+                          {plan.itinerary.length}日間のプラン
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">予算目安</span>
