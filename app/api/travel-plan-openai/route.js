@@ -18,11 +18,21 @@ const defaultPromptTemplate = `
 - 興味: {{interests}}
 - その他の要望: {{additional_requests}}
 
+**参加者の個別要望:**
+{{participants_preferences}}
+
 **重要な制約事項:**
 - **同じアクティビティや同じ場所への訪問は一度のみとし、旅行期間中に重複させないでください**
 - 各日の活動場所やアクティビティは全て異なるものにしてください
 - 同一施設や同一エリアでの複数回の訪問は避けてください
 - レストランや飲食店も可能な限り重複しないようにしてください
+
+**複数人の要望統合ガイドライン:**
+- すべての参加者の希望を可能な限り旅行プランに含めてください
+- 相反する要望がある場合は、バランスを取りながら妥協案を提示してください
+- 各参加者の「行きたい場所」は優先的にプランに組み込んでください
+- 特定の参加者だけの要望ではなく、全員が楽しめる活動を優先してください
+- 年齢層や体力差がある場合は、全員が参加できる活動を選んでください
 
 **海外旅行の特別考慮事項:**
 - 海外旅行の場合、移動日（往復の航空機利用日）も旅行期間に含めて計算してください
@@ -57,15 +67,6 @@ const defaultPromptTemplate = `
     "destination": "目的地",
     "duration": "期間（日数）",
     "budget": "予算の目安",
-    "hero_image": "メイン画像URL",
-    "key_visual": {
-      "main_image": "メイン画像URL",
-      "alt_images": [
-        "代替画像URL1",
-        "代替画像URL2"
-      ],
-      "mood": "画像の雰囲気（例：serene_traditional, vibrant_modern等）"
-    },
     "highlights": [
       "旅行のハイライト1",
       "旅行のハイライト2",
@@ -80,7 +81,6 @@ const defaultPromptTemplate = `
         "name": "都市名（日本語）",
         "name_en": "City Name (English)",
         "description": "都市の説明・特徴",
-        "image": "都市の画像URL"
       },
       "activities": [
         {
@@ -90,7 +90,6 @@ const defaultPromptTemplate = `
           "subtitle": "アクティビティのサブタイトル",
           "type": "アクティビティの種類（heritage, culinary, experience, scenic等）",
           "priority": "優先度（must_see, must_do, recommended等）",
-          "image": "アクティビティの画像URL",
           "description": "詳細な説明",
           "location": "場所の名称",
           "price": "料金",
@@ -100,8 +99,6 @@ const defaultPromptTemplate = `
           "image_search_term": "City Name + Activity in English",
           "category": "sightseeing, food, activity, shopping..etc",
           "is_free": "アクティビティにお金がかかるか否か（bool）",
-          "fee": "入園料",
-          "notes": "メモ（任意）"
         }
       ],
       "accommodation": "宿泊予定の場所（市・地域）"
@@ -148,9 +145,10 @@ export async function PUT(request) {
  * @returns {Object|null} - パースされたJSONオブジェクト、エラーの場合はnull
  */
 function cleanAndParseJSON(inputString) {
+  let cleanedString = inputString;
   try {
     // 文字列の前後の空白を除去
-    let cleanedString = inputString.trim();
+    cleanedString = inputString.trim();
     
     // ```json または ``` で始まる行を削除
     cleanedString = cleanedString.replace(/^```json\s*/m, '');
@@ -168,6 +166,7 @@ function cleanAndParseJSON(inputString) {
   } catch (error) {
     console.error('JSON parsing error:', error.message);
     console.error('Problematic string:', cleanedString);
+    
     return null;
   }
 }
@@ -185,7 +184,8 @@ export async function POST(request) {
       number_of_people, 
       interests, 
       additional_requests, 
-      customPrompt 
+      customPrompt,
+      participants // 新しい複数人対応パラメータ
     } = body;
     
     // 必須パラメータの検証
@@ -196,8 +196,46 @@ export async function POST(request) {
       );
     }
     
+    // 参加者の要望を統合する関数
+    function formatParticipantsPreferences(participants) {
+      if (!participants || !Array.isArray(participants) || participants.length === 0) {
+        return '特になし';
+      }
+      
+      return participants.map((participant, index) => {
+        const name = participant.name || `参加者${index + 1}`;
+        const age = participant.age ? `（${participant.age}歳）` : '';
+        const wishes = participant.wishes || [];
+        const interests = participant.interests || [];
+        const restrictions = participant.restrictions || [];
+        
+        let participantInfo = `**${name}${age}:**\n`;
+        
+        if (wishes.length > 0) {
+          participantInfo += `- 行きたい場所: ${wishes.join(', ')}\n`;
+        }
+        
+        if (interests.length > 0) {
+          participantInfo += `- 興味・関心: ${interests.join(', ')}\n`;
+        }
+        
+        if (restrictions.length > 0) {
+          participantInfo += `- 制約・配慮事項: ${restrictions.join(', ')}\n`;
+        }
+        
+        if (participant.budget) {
+          participantInfo += `- 個人予算: ${participant.budget}\n`;
+        }
+        
+        return participantInfo;
+      }).join('\n');
+    }
+    
     // カスタムプロンプトが提供された場合は使用
     const promptToUse = customPrompt || currentPromptTemplate;
+    
+    // 参加者の要望をフォーマット
+    const participantsPreferences = formatParticipantsPreferences(participants);
     
     // プロンプトにパラメータを埋め込む
     let filledPrompt = promptToUse
@@ -206,7 +244,8 @@ export async function POST(request) {
       .replace('{{budget}}', budget || '')
       .replace('{{number_of_people}}', number_of_people || '')
       .replace('{{interests}}', interests || '')
-      .replace('{{additional_requests}}', additional_requests || '');
+      .replace('{{additional_requests}}', additional_requests || '')
+      .replace('{{participants_preferences}}', participantsPreferences);
     
     // OpenAI Chat Completions APIを呼び出し(検索機能持ちプランニングモデル)
     const response1 = await client.chat.completions.create({
@@ -241,29 +280,7 @@ export async function POST(request) {
     console.log('=== 解析されたJSONオブジェクト ===');
     console.log(parsedJSON);
 
-    // // 出力をjson形式に編集するLLM
-    // const response2 = await client.chat.completions.create({
-    //   model: "gpt-4o-mini-2024-07-18",
-    //   messages: [
-    //     { 
-    //       role: "system", 
-    //       content: "あなたは入力をJSON形式に修正する専門家です。正確に回答してください。" 
-    //     },
-    //     { role: "user", content: messageContent1 }
-    //   ],
-    //   temperature: 0.7,
-    //   max_tokens: 4000,
-    //   response_format: { type: "json_object" }, // JSON形式での応答を強制
-    // });
-    
-    // // レスポンスの検証
-    // const messageContent2 = response2.choices[0]?.message?.content;
-    
-    // if (!messageContent2) {
-    //   throw new Error('No content received from OpenAI API');
-    // }
-
-    let travelPlan = parsedJSON
+    let travelPlan = parsedJSON;
     // 基本的な構造の検証
     if (!travelPlan.trip_id || !travelPlan.theme || !travelPlan.hero || !travelPlan.itinerary || !Array.isArray(travelPlan.itinerary)) {
       throw new Error('Invalid travel plan structure');
