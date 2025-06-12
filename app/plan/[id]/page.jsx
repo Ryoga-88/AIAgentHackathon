@@ -21,6 +21,11 @@ export default function PlanDetailPage() {
     router.push('/plans');
   };
 
+  const handleBookingClick = (type) => {
+    // 実際の予約サイトにリダイレクトする処理
+    console.log(`${type}の予約を開始`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -181,52 +186,61 @@ export default function PlanDetailPage() {
             <div className="sticky top-24 space-y-6">
               {/* Booking Links */}
               <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">予約リンク</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">🔗 予約リンク</h3>
                 <div className="space-y-3">
-                  <a
-                    href="#"
-                    className="block bg-blue-50 hover:bg-blue-100 p-4 rounded-lg transition-colors"
+                  <button
+                    onClick={() => handleBookingClick('hotel')}
+                    className="w-full bg-blue-50 hover:bg-blue-100 p-4 rounded-lg transition-colors text-left group"
                   >
                     <div className="flex items-center">
-                      <div className="text-2xl mr-3">🏨</div>
+                      <div className="text-2xl mr-3 group-hover:scale-110 transition-transform">🏨</div>
                       <div>
                         <div className="font-medium text-gray-900">宿泊施設を予約</div>
                         <div className="text-sm text-gray-600">おすすめホテル・旅館</div>
                       </div>
+                      <svg className="w-5 h-5 ml-auto text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </div>
-                  </a>
+                  </button>
                   
-                  <a
-                    href="#"
-                    className="block bg-green-50 hover:bg-green-100 p-4 rounded-lg transition-colors"
+                  <button
+                    onClick={() => handleBookingClick('transport')}
+                    className="w-full bg-green-50 hover:bg-green-100 p-4 rounded-lg transition-colors text-left group"
                   >
                     <div className="flex items-center">
-                      <div className="text-2xl mr-3">🚗</div>
+                      <div className="text-2xl mr-3 group-hover:scale-110 transition-transform">🚗</div>
                       <div>
                         <div className="font-medium text-gray-900">交通手段を予約</div>
                         <div className="text-sm text-gray-600">電車・バス・レンタカー</div>
                       </div>
+                      <svg className="w-5 h-5 ml-auto text-gray-400 group-hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </div>
-                  </a>
+                  </button>
                   
-                  <a
-                    href="#"
-                    className="block bg-purple-50 hover:bg-purple-100 p-4 rounded-lg transition-colors"
+                  <button
+                    onClick={() => handleBookingClick('tickets')}
+                    className="w-full bg-purple-50 hover:bg-purple-100 p-4 rounded-lg transition-colors text-left group"
                   >
                     <div className="flex items-center">
-                      <div className="text-2xl mr-3">🎫</div>
+                      <div className="text-2xl mr-3 group-hover:scale-110 transition-transform">🎫</div>
                       <div>
                         <div className="font-medium text-gray-900">チケット・体験予約</div>
                         <div className="text-sm text-gray-600">入場券・アクティビティ</div>
                       </div>
+                      <svg className="w-5 h-5 ml-auto text-gray-400 group-hover:text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </div>
-                  </a>
+                  </button>
                 </div>
               </div>
 
               {/* Plan Summary */}
               <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">プラン概要</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 プラン概要</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-600">期間</span>
@@ -244,10 +258,24 @@ export default function PlanDetailPage() {
                 
                 <button
                   onClick={handleConfirm}
-                  className="w-full mt-6 bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                  className="w-full mt-6 bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center"
                 >
-                  プランを確定する
+                  <span>プランを確定する</span>
+                  <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
                 </button>
+              </div>
+
+              {/* Additional Info */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
+                <h4 className="font-semibold text-gray-900 mb-2">💡 お得な情報</h4>
+                <p className="text-sm text-gray-700 mb-3">
+                  早期予約で最大20%オフ！宿泊施設とセットで予約するとさらにお得です。
+                </p>
+                <div className="text-xs text-blue-600 font-medium">
+                  キャンペーン期間: 6月末まで
+                </div>
               </div>
             </div>
           </div>
