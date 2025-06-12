@@ -1,9 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "../contexts/AuthContext";
+import UserProfile from "../components/Auth/UserProfile";
 
 export default function Home() {
   const router = useRouter();
+  const { currentUser } = useAuth();
   const [formData, setFormData] = useState({
     destination: "",
     duration: 2,
@@ -55,7 +58,7 @@ export default function Home() {
       localStorage.setItem('travelPlans', JSON.stringify(data));
       console.log('💾 Saved to localStorage'); // デバッグ用
       
-      // プラン一覧ページに遷移
+      // プラン一覧ページに遷移（ログイン不要でプレビュー可能）
       router.push('/plans');
     } catch (err) {
       console.error('❌ Error:', err); // デバッグ用
@@ -84,6 +87,18 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header with User Profile */}
+      <div className="relative z-10 bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center">
+              <h2 className="text-xl font-semibold text-gray-900">旅行 AI プランナー</h2>
+            </div>
+            <UserProfile />
+          </div>
+        </div>
+      </div>
+
       {/* Hero Section */}
       <div className="relative overflow-hidden bg-white">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 opacity-90"></div>

@@ -4,9 +4,13 @@ import { useRouter } from "next/navigation";
 import { getMockPlans } from "../../data/mockData";
 import { getLocationData, extractLocationsFromPlan, getMultipleLocationsData, enrichPlanWithLocationData } from "../../utils/locationUtils";
 import InteractiveMap from "../../components/InteractiveMap";
+import { useAuth } from "../../contexts/AuthContext";
+import UserProfile from "../../components/Auth/UserProfile";
+import BlurredContent from "../../components/BlurredContent";
 
 export default function PlansPage() {
   const router = useRouter();
+  const { currentUser, loading: authLoading } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null);
   const [regeneratingActivity, setRegeneratingActivity] = useState(null);
@@ -17,46 +21,108 @@ export default function PlansPage() {
   const [locationData, setLocationData] = useState({});
   const [activityImages, setActivityImages] = useState({});
   const [routeData, setRouteData] = useState({});
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+
+  // プランデータの存在確認
+  useEffect(() => {
+    const storedPlans = localStorage.getItem('travelPlans');
+    console.log('🔍 プランデータ存在確認:', storedPlans ? 'データ有り' : 'データ無し');
+    
+    // プランデータがない場合はホームページにリダイレクト（認証状態に関係なく）
+    if (!storedPlans) {
+      console.log('⚠️ プランデータなし、ホームページにリダイレクト');
+      router.push('/');
+      return;
+    }
+  }, [router]); // 認証状態を依存から除外
+
+  // プランデータがない場合のローディング表示
+  const storedPlans = typeof window !== 'undefined' ? localStorage.getItem('travelPlans') : null;
+  
+  // 認証のローディング中でもプランデータがある場合は表示を続ける
+  if (authLoading && !storedPlans) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 mb-4">認証状態を確認中...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!storedPlans && !loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🗺️</div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">プランが見つかりません</h3>
+          <p className="text-gray-600 mb-4">まずはプランを作成してください</p>
+          <button
+            onClick={() => router.push('/')}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          >
+            プランを作成する
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // LLMの出力データまたはローカルストレージからプランを取得
   useEffect(() => {
     const fetchPlans = async () => {
-      try {
-        // まずローカルストレージから最新のプランを確認
-        const storedPlans = localStorage.getItem('travelPlans');
-        console.log('LocalStorage data:', storedPlans); // デバッグ用
-        
-        if (storedPlans) {
-          const parsedPlans = JSON.parse(storedPlans);
-          console.log('Parsed plans:', parsedPlans); // デバッグ用
+      if (loading) { // 既にローディング中の場合は実行しない
+        try {
+          // まずローカルストレージから最新のプランを確認
+          const storedPlans = localStorage.getItem('travelPlans');
+          console.log('🔍 LocalStorage data:', storedPlans ? 'データ有り' : 'データ無し'); // デバッグ用
+          console.log('👤 Current user:', currentUser ? 'ログイン済み' : '未ログイン'); // デバッグ用
+          console.log('⏳ Auth loading:', authLoading); // デバッグ用
           
-          if (parsedPlans.plans && Array.isArray(parsedPlans.plans)) {
-            console.log('Using LLM plans (multiple):', parsedPlans.plans.length); // デバッグ用
-            setPlans(parsedPlans.plans);
-          } else if (Array.isArray(parsedPlans)) {
-            console.log('Using LLM plans (array):', parsedPlans.length); // デバッグ用
-            setPlans(parsedPlans);
+          if (storedPlans) {
+            const parsedPlans = JSON.parse(storedPlans);
+            console.log('📊 Parsed plans:', parsedPlans); // デバッグ用
+            
+            if (parsedPlans.plans && Array.isArray(parsedPlans.plans)) {
+              console.log('✅ Using LLM plans (multiple):', parsedPlans.plans.length); // デバッグ用
+              setPlans(parsedPlans.plans);
+            } else if (Array.isArray(parsedPlans)) {
+              console.log('✅ Using LLM plans (array):', parsedPlans.length); // デバッグ用
+              setPlans(parsedPlans);
+            } else {
+              // 単一プランの場合は配列に変換
+              console.log('✅ Using LLM plans (single)'); // デバッグ用
+              setPlans([parsedPlans]);
+            }
           } else {
-            // 単一プランの場合は配列に変換
-            console.log('Using LLM plans (single)'); // デバッグ用
-            setPlans([parsedPlans]);
+            // ローカルストレージにデータがない場合はMockデータを使用
+            console.log('🎭 Using mock data'); // デバッグ用
+            const mockPlans = getMockPlans();
+            setPlans(mockPlans);
           }
-        } else {
-          // ローカルストレージにデータがない場合はMockデータを使用
-          console.log('Using mock data'); // デバッグ用
+        } catch (error) {
+          console.error('❌ プランの取得に失敗:', error);
+          // エラー時はMockデータを使用
           const mockPlans = getMockPlans();
           setPlans(mockPlans);
+        } finally {
+          setLoading(false);
         }
-      } catch (error) {
-        console.error('プランの取得に失敗:', error);
-        // エラー時はMockデータを使用
-        const mockPlans = getMockPlans();
-        setPlans(mockPlans);
       }
     };
 
     fetchPlans();
-  }, []);
+  }, []); // 依存配列を空にして、最初の1回のみ実行
+
+  // 認証状態が変わった時の追加ログ
+  useEffect(() => {
+    console.log('🔄 認証状態が変化:', {
+      currentUser: currentUser ? 'ログイン済み' : '未ログイン',
+      authLoading,
+      plansCount: plans.length
+    });
+  }, [currentUser, authLoading, plans.length]);
 
   // 位置情報とホテル情報を取得
   useEffect(() => {
@@ -311,25 +377,55 @@ export default function PlansPage() {
               <h1 className="text-2xl font-bold text-gray-900">旅行プラン提案</h1>
               <p className="text-gray-600">あなたに最適な3つのプランをご用意しました</p>
             </div>
-            <button
-              onClick={handleRegenerate}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              新しいプランを生成
-            </button>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={handleRegenerate}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                新しいプランを生成
+              </button>
+              <UserProfile />
+            </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* ユーザー向け案内 - 未認証時 */}
+        {!currentUser && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+            <div className="flex items-start space-x-3">
+              <div className="text-2xl">ℹ️</div>
+              <div>
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">プランが生成されました！</h3>
+                <p className="text-blue-800 text-sm mb-3">
+                  プランの概要はご覧いただけますが、詳細な情報（ホテル、ルート、アクティビティの詳細など）を見るにはログインが必要です。
+                </p>
+                <button
+                  onClick={() => router.push('/login?redirect=%2Fplans')}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                >
+                  ログインして詳細を見る
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Debug Info - 開発時のみ表示 */}
         {process.env.NODE_ENV === 'development' && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <h3 className="text-sm font-medium text-yellow-800 mb-2">🔧 デバッグ情報</h3>
             <div className="text-xs text-yellow-700">
               <p>プラン数: {plans.length}</p>
+              <p>認証状態: {currentUser ? 'ログイン済み' : '未ログイン'}</p>
+              <p>認証ローディング: {authLoading ? '読み込み中' : '完了'}</p>
               <p>データソース: {plans.length > 0 && plans[0].trip_id?.includes('mock') ? 'Mock データ' : 'LLM データ'}</p>
               <p>LocalStorage: {typeof window !== 'undefined' && localStorage.getItem('travelPlans') ? '有り' : '無し'}</p>
+              <p>選択されたプラン: {selectedPlan !== null ? `プラン ${selectedPlan + 1}` : 'なし'}</p>
+              {currentUser && (
+                <p>ユーザー: {currentUser.displayName || currentUser.email}</p>
+              )}
               <button 
                 onClick={() => {
                   localStorage.removeItem('travelPlans');
@@ -400,11 +496,12 @@ export default function PlansPage() {
 
         {/* Selected Plan Details */}
         {selectedPlanData && (
-          <div className="lg:grid lg:grid-cols-3 lg:gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2">
-              {/* Detailed Itinerary */}
-              <div className="space-y-8">
+          <BlurredContent isAuthenticated={!!currentUser} title="詳細なプラン">
+            <div className="lg:grid lg:grid-cols-3 lg:gap-8">
+              {/* Main Content */}
+              <div className="lg:col-span-2">
+                {/* Detailed Itinerary */}
+                <div className="space-y-8">
                 {selectedPlanData.itinerary.map((day, dayIndex) => (
                   <div key={day.day} className="bg-white rounded-2xl shadow-lg overflow-hidden">
                     {/* Day Header */}
@@ -798,6 +895,7 @@ export default function PlansPage() {
               </div>
             </div>
           </div>
+          </BlurredContent>
         )}
 
         {/* Empty State */}

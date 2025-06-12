@@ -1,19 +1,22 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import LoginForm from '../../components/Auth/LoginForm';
 
 export default function LoginPage() {
   const { currentUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (currentUser) {
-      router.push('/');
+      // リダイレクト先を取得（デフォルトは /plans）
+      const redirectTo = searchParams.get('redirect') || '/plans';
+      router.push(redirectTo);
     }
-  }, [currentUser, router]);
+  }, [currentUser, router, searchParams]);
 
   if (currentUser) {
     return null;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '../../contexts/AuthContext';
+import Link from 'next/link';
 
 export default function UserProfile() {
   const { currentUser, logout } = useAuth();
@@ -14,7 +15,16 @@ export default function UserProfile() {
   };
 
   if (!currentUser) {
-    return null;
+    return (
+      <div className="flex items-center space-x-4">
+        <Link 
+          href="/login" 
+          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+        >
+          ログイン
+        </Link>
+      </div>
+    );
   }
 
   return (
