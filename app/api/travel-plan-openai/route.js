@@ -1,10 +1,17 @@
 import OpenAI from "openai";
 import { NextResponse } from 'next/server';
 
-// OpenAI クライアントの初期化
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// OpenAI クライアントの初期化（APIキーがない場合はnull）
+let client = null;
+try {
+  if (process.env.OPENAI_API_KEY) {
+    client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+} catch (error) {
+  console.log('OpenAI client initialization failed:', error.message);
+}
 
 // デフォルトのプロンプトテンプレート
 const defaultPromptTemplate = `
@@ -172,6 +179,15 @@ export async function PUT(request) {
 // POST: 旅行プランを生成
 export async function POST(request) {
   try {
+    // OpenAI APIキーのチェック
+    if (!client) {
+      console.log('OpenAI API key not configured, returning mock data');
+      // APIキーがない場合はモックデータを返す
+      const { getMockPlans } = await import('../../../data/mockData');
+      const mockPlans = getMockPlans();
+      return NextResponse.json({ plans: mockPlans.slice(0, 3) });
+    }
+
     const body = await request.json();
     
     // リクエストからパラメータを取得
