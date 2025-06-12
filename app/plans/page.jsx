@@ -7,7 +7,7 @@ import InteractiveMap from "../../components/InteractiveMap";
 import { useAuth } from "../../contexts/AuthContext";
 import UserProfile from "../../components/Auth/UserProfile";
 import BlurredContent from "../../components/BlurredContent";
-import CostBreakdown from "../../components/CostBreakdown";
+import ProgressModalDynamic from "../../components/ProgressModalDynamic";
 
 export default function PlansPage() {
   const router = useRouter();
@@ -30,7 +30,11 @@ export default function PlansPage() {
   const [endDate, setEndDate] = useState('');
   const [showRegenerateForm, setShowRegenerateForm] = useState(false);
   const [additionalPrompt, setAdditionalPrompt] = useState('');
-  const [people, setPeople] = useState(2); // 追加: 旅行者人数
+  const [people, setPeople] = useState(2);
+  
+  // 進捗モーダル用の状態
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenerationProgress, setRegenerationProgress] = useState(0);
 
   // クライアントサイドレンダリングの確認とプランデータの存在確認
   useEffect(() => {
@@ -360,6 +364,10 @@ export default function PlansPage() {
           const dayImageResponses = await Promise.all(dayImagePromises);
           dayImageResponses.forEach(response => {
             if (response) {
+              if (!dayImageResults[response.trip_id]) {
+                dayImageResults[response.trip_id] = {};
+              }
+              // 修正: day番号で直接保存
               dayImageResults[response.trip_id][response.day] = response.data;
             }
           });
@@ -547,7 +555,7 @@ export default function PlansPage() {
     }
   };
 
-  // 既存のfetchRoutesを置き換え
+  // fetchRoutes関数の修正
   const fetchDetailedRoutes = async (tripId, planData) => {
     try {
       if (!planData?.itinerary) return;
@@ -560,6 +568,12 @@ export default function PlansPage() {
 
       // 各日の詳細経路を取得
       for (const day of planData.itinerary) {
+        // day.activitiesが存在しない場合はスキップ
+        if (!day.activities || !Array.isArray(day.activities)) {
+          console.warn(`Day ${day.day}: activitiesが存在しないか、配列ではありません`, day);
+          continue;
+        }
+
         const dayKey = `day_${day.day}`;
         console.log(`\n--- Day ${day.day} 開始 ---`);
         
@@ -572,21 +586,21 @@ export default function PlansPage() {
 
         // その日のアクティビティ（search_queryがあるもののみ）
         const dayActivities = day.activities.filter(activity => 
-          activity.search_query && activity.search_query.trim() !== ''
+          activity && activity.search_query && activity.search_query.trim() !== ''
         );
 
         console.log(`Day ${day.day} 全アクティビティ:`, day.activities.map(a => ({
-          title: a.title, 
-          search_query: a.search_query || 'なし'
+          title: a?.title || '不明', 
+          search_query: a?.search_query || 'なし'
         })));
         console.log(`Day ${day.day} 有効なアクティビティ:`, dayActivities.map(a => a.title));
 
         // 前日の最後のアクティビティから今日の最初のアクティビティへの移動（日跨ぎ）
         if (day.day > 1 && dayActivities.length > 0) {
           const previousDay = planData.itinerary.find(d => d.day === day.day - 1);
-          if (previousDay) {
+          if (previousDay && previousDay.activities && Array.isArray(previousDay.activities)) {
             const previousDayActivities = previousDay.activities.filter(activity => 
-              activity.search_query && activity.search_query.trim() !== ''
+              activity && activity.search_query && activity.search_query.trim() !== ''
             );
             
             if (previousDayActivities.length > 0) {
@@ -658,6 +672,12 @@ export default function PlansPage() {
 
       // 全ての経路セグメントを並行取得
       console.log(`\n📊 総経路セグメント数: ${routePromises.length}`);
+      
+      if (routePromises.length === 0) {
+        console.log('⚠️ 経路セグメントがありません。経路データの設定をスキップします。');
+        return;
+      }
+      
       const routeResults = await Promise.all(routePromises);
       
       // 結果を整理
@@ -1014,8 +1034,31 @@ export default function PlansPage() {
       return;
     }
 
+    setShowRegenerateForm(false);
+    setIsRegenerating(true);
+    setRegenerationProgress(0);
+
+    let progressInterval;
+
     try {
-      // 現在のプランデータと追加プロンプトを組み合わせて新しいプランを生成
+      console.log('=== プラン修正開始 ===');
+      console.log('選択されたプラン:', selectedPlan);
+      console.log('元のプラン ID:', selectedPlanData?.trip_id);
+      console.log('修正要望:', additionalPrompt);
+
+      // 進捗シミュレーション
+      progressInterval = setInterval(() => {
+        setRegenerationProgress(prev => {
+          if (prev >= 95) {
+            clearInterval(progressInterval);
+            return 95;
+          }
+          const increment = prev < 30 ? 8 : prev < 60 ? 5 : prev < 80 ? 3 : 1;
+          return prev + increment;
+        });
+      }, 800);
+
+      // API呼び出し
       const response = await fetch('/api/modify-travel-plan', {
         method: 'POST',
         headers: {
@@ -1024,26 +1067,168 @@ export default function PlansPage() {
         body: JSON.stringify({
           original_plan: selectedPlanData,
           plan_number: selectedPlan + 1,
-          modification_request: additionalPrompt,
+          modification_request: additionalPrompt.trim(),
           full_plans_data: plans
         }),
       });
 
+      console.log('=== APIレスポンス ===');
+      console.log('Status:', response.status);
+      console.log('Status Text:', response.statusText);
+      console.log('OK:', response.ok);
+
+      // 進捗を100%に
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+      setRegenerationProgress(100);
+
+      // レスポンステキストを取得
+      const responseText = await response.text();
+      console.log('=== レスポンステキスト ===');
+      console.log('Length:', responseText.length);
+      console.log('Preview:', responseText.substring(0, 500));
+
       if (response.ok) {
-        const newPlans = await response.json();
-        localStorage.setItem('travelPlans', JSON.stringify(newPlans));
-        // ページをリロードして新しいプランを表示
-        window.location.reload();
+        let responseData;
+        try {
+          responseData = JSON.parse(responseText);
+          console.log('=== JSONパース成功 ===');
+          console.log('Response keys:', Object.keys(responseData));
+          console.log('Success flag:', responseData.success);
+        } catch (parseError) {
+          console.error('=== JSONパースエラー ===', parseError);
+          console.error('Raw response:', responseText);
+          throw new Error('サーバーからの応答が無効なJSON形式です');
+        }
+        
+        // APIレスポンス形式に合わせた検証
+        if (!responseData.success) {
+          throw new Error('プランの修正に失敗しました');
+        }
+
+        if (!responseData.modified_plan) {
+          throw new Error('修正されたプランデータが返されませんでした');
+        }
+
+        const modifiedPlan = responseData.modified_plan;
+        
+        // プランデータの基本検証
+        if (!modifiedPlan.trip_id) {
+          console.warn('Trip IDが不足しているため、自動生成します');
+          modifiedPlan.trip_id = `modified_${selectedPlanData.trip_id}_${Date.now()}`;
+        }
+
+        if (!modifiedPlan.hero) {
+          console.warn('Hero情報が不足しているため、元のデータを使用します');
+          modifiedPlan.hero = selectedPlanData.hero;
+        }
+
+        if (!modifiedPlan.itinerary || !Array.isArray(modifiedPlan.itinerary)) {
+          console.warn('Itinerary情報が不足しているため、元のデータを使用します');
+          modifiedPlan.itinerary = selectedPlanData.itinerary;
+        }
+
+        console.log('=== 修正されたプラン ===');
+        console.log('Trip ID:', modifiedPlan.trip_id);
+        console.log('Title:', modifiedPlan.hero?.title);
+        console.log('Days:', modifiedPlan.itinerary?.length);
+        console.log('Summary:', modifiedPlan.modification_summary);
+
+        // 既存のプラン配列を更新（選択されたプランのみを置き換え）
+        const updatedPlans = [...plans];
+        updatedPlans[selectedPlan] = modifiedPlan;
+        
+        console.log('=== プラン配列更新 ===');
+        console.log('更新前プラン数:', plans.length);
+        console.log('更新後プラン数:', updatedPlans.length);
+        console.log('修正対象インデックス:', selectedPlan);
+
+        // ローカルストレージに保存
+        localStorage.setItem('travelPlans', JSON.stringify(updatedPlans));
+        
+        // 完了処理
+        setTimeout(() => {
+          setPlans(updatedPlans);
+          setSelectedPlan(selectedPlan); // 同じプランを再選択
+          setIsRegenerating(false);
+          setRegenerationProgress(0);
+          
+          const planTitle = modifiedPlan.hero?.title || `プラン ${selectedPlan + 1}`;
+          const summary = modifiedPlan.modification_summary || '要望に基づいて更新されました';
+          
+          alert(`✅ プラン修正完了\n\n「${planTitle}」\n\n修正内容: ${summary}`);
+        }, 1000);
+        
       } else {
-        alert('プランの生成に失敗しました。もう一度お試しください。');
+        // エラーレスポンスの処理
+        console.error('=== APIエラー ===');
+        console.error('Status:', response.status);
+        console.error('Response:', responseText);
+        
+        let errorMessage = 'プランの修正に失敗しました。';
+        
+        try {
+          const errorData = JSON.parse(responseText);
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+          if (errorData.details) {
+            console.error('Error details:', errorData.details);
+            errorMessage += `\n詳細: ${errorData.details}`;
+          }
+        } catch {
+          // JSON パースに失敗した場合のエラーハンドリング
+          if (response.status === 429) {
+            errorMessage = 'リクエストが多すぎます。しばらく待ってから再試行してください。';
+          } else if (response.status === 401) {
+            errorMessage = 'API認証エラーが発生しました。管理者にお問い合わせください。';
+          } else if (response.status === 500) {
+            errorMessage = 'サーバー内部エラーが発生しました。しばらく待ってから再試行してください。';
+          } else {
+            errorMessage += ` (HTTP ${response.status})`;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
     } catch (error) {
-      console.error('プラン再生成エラー:', error);
-      alert('プランの生成中にエラーが発生しました。');
+      console.error('=== プラン修正エラー (全体) ===', error);
+      
+      let userMessage = 'プランの修正中にエラーが発生しました。';
+      
+      if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+        userMessage = 'ネットワーク接続に問題があります。インターネット接続を確認してください。';
+      } else if (error.message.includes('JSON') || error.message.includes('parse')) {
+        userMessage = 'サーバーからの応答形式に問題があります。しばらく待ってから再試行してください。';
+      } else if (error.message.includes('API認証')) {
+        userMessage = 'サービスの認証に問題があります。管理者にお問い合わせください。';
+      } else if (error.message.includes('リクエストが多すぎます')) {
+        userMessage = 'リクエストが多すぎます。1分ほど待ってから再試行してください。';
+      } else if (error.message.includes('サーバー内部エラー')) {
+        userMessage = 'サーバーで問題が発生しています。しばらく待ってから再試行してください。';
+      } else if (error.message) {
+        userMessage = error.message;
+      }
+      
+      alert(`❌ エラー\n\n${userMessage}`);
+    } finally {
+      // 確実にクリーンアップ
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+      setIsRegenerating(false);
+      setRegenerationProgress(0);
+      setAdditionalPrompt('');
     }
+  };
 
-    setShowRegenerateForm(false);
-    setAdditionalPrompt('');
+  // キャンセル処理
+  const handleRegenerationCancel = () => {
+    setIsRegenerating(false);
+    setRegenerationProgress(0);
+    setShowRegenerateForm(true);
   };
 
   if (loading) {
@@ -1080,6 +1265,16 @@ export default function PlansPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* 進捗モーダル */}
+      <ProgressModalDynamic 
+        isVisible={isRegenerating}
+        progress={regenerationProgress}
+        totalPlans={1}
+        onCancel={handleRegenerationCancel}
+        customTitle="プランをカスタマイズ中..."
+        customSubtitle="あなたの要望を反映した新しいプランを生成しています"
+      />
+
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1154,7 +1349,6 @@ export default function PlansPage() {
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-blue-600 font-semibold">
                       {(() => {
-                        // hero.durationがある場合はそれを使用、なければitineraryから計算
                         if (plan.hero?.duration) {
                           return plan.hero.duration;
                         } else if (plan.itinerary && plan.itinerary.length > 0) {
@@ -1199,7 +1393,7 @@ export default function PlansPage() {
         </div>
 
         {/* Selected Plan Details */}
-        {selectedPlanData && (
+        {selectedPlanData && !isRegenerating && (
           <BlurredContent isAuthenticated={!!currentUser} title="詳細なプラン">
             <div className="lg:grid lg:grid-cols-3 lg:gap-8">
               {/* Main Content */}
@@ -1696,11 +1890,11 @@ export default function PlansPage() {
                 </div>
 
                 {/* Cost Breakdown */}
-                <CostBreakdown 
+                {/* <CostBreakdown 
                   plan={selectedPlanData}
                   routeData={routeData[selectedPlanData.trip_id]}
                   hotels={hotels[selectedPlanData.trip_id]}
-                />
+                /> */}
               </div>
             </div>
           </div>
@@ -1765,7 +1959,7 @@ export default function PlansPage() {
         )}
 
         {/* Empty State */}
-        {selectedPlan === null && (
+        {selectedPlan === null && !isRegenerating && (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">🗺️</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">プランを選択してください</h3>
@@ -1831,7 +2025,7 @@ const fetchHeroImages = async (tripId, planData) => {
   try {
     const response = await fetch('/api/search-images', {
       method: 'POST',
-                     headers: {
+      headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -1864,6 +2058,7 @@ const fetchHeroImages = async (tripId, planData) => {
   }
 };
 
+// fetchDayImages関数の修正
 const fetchDayImages = async (tripId, planData) => {
   try {
     const imagePromises = planData.itinerary.map(async (day) => {
@@ -1904,7 +2099,10 @@ const fetchDayImages = async (tripId, planData) => {
     const imageMap = {};
     
     imageResults.forEach(result => {
-      imageMap[`day_${result.day}`] = result.imageUrl;
+      // 修正: day番号で直接保存
+      imageMap[result.day] = {
+        photo_url: result.imageUrl
+      };
     });
     
     setDayImages(prev => ({

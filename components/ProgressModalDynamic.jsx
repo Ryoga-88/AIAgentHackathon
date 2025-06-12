@@ -1,7 +1,15 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 
-const ProgressModalDynamic = ({ isVisible, progress, totalPlans = 3, onCancel, onPlanReceived }) => {
+const ProgressModalDynamic = ({ 
+  isVisible, 
+  progress, 
+  totalPlans = 3, 
+  onCancel, 
+  onPlanReceived,
+  customTitle = "AIが旅行プランを作成中...",
+  customSubtitle = "あなたの理想の旅程を生成しています"
+}) => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState(null);
   const [isCalculating, setIsCalculating] = useState(true);
@@ -133,40 +141,27 @@ const ProgressModalDynamic = ({ isVisible, progress, totalPlans = 3, onCancel, o
     }
   }, [progress, plansReceived, timePerPlan, totalPlans, isCalculating, smoothedEstimatedTime]);
 
-  if (!isVisible) return null;
-
-  const progressPercentage = Math.min(100, progress || 0);
-  const remainingTime = smoothedEstimatedTime ? Math.max(0, smoothedEstimatedTime - elapsedTime) : 0;
-  
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const getStatusText = () => {
-    if (isCalculating) {
-      return "AIがプラン生成時間を計算中...";
-    }
-    
-    const progressPercentage = Math.min(100, progress || 0);
-    
-    if (progressPercentage < 25) {
-      return "旅行先の情報を収集しています...";
-    } else if (progressPercentage < 60) {
-      return `推定残り時間: ${formatTime(remainingTime)} (第1プラン完成)`;
-    } else if (progressPercentage < 90) {
-      return `推定残り時間: ${formatTime(remainingTime)} (第2プラン生成中)`;
-    } else if (progressPercentage < 100) {
-      return `推定残り時間: ${formatTime(remainingTime)} (第3プラン仕上げ中)`;
-    } else {
-      return "プラン生成完了！";
-    }
-  };
-
   const getCurrentActivity = () => {
     const progressPercentage = Math.min(100, progress || 0);
     
+    // カスタマイズ用の活動表示（totalPlans = 1の場合）
+    if (totalPlans === 1) {
+      if (progressPercentage < 15) {
+        return "要望を分析中...";
+      } else if (progressPercentage < 35) {
+        return "現在のプランを解析中...";
+      } else if (progressPercentage < 60) {
+        return "カスタマイズされたプランを作成中...";
+      } else if (progressPercentage < 85) {
+        return "スポット情報を最新化中...";
+      } else if (progressPercentage < 100) {
+        return "最終調整中...";
+      } else {
+        return "カスタマイズ完了";
+      }
+    }
+    
+    // 既存の3プラン生成用の活動表示
     if (progressPercentage < 10) {
       return "目的地の観光情報を調査中";
     } else if (progressPercentage < 25) {
@@ -184,6 +179,17 @@ const ProgressModalDynamic = ({ isVisible, progress, totalPlans = 3, onCancel, o
     } else {
       return "生成完了";
     }
+  };
+
+  if (!isVisible) return null;
+
+  const progressPercentage = Math.min(100, progress || 0);
+  const remainingTime = smoothedEstimatedTime ? Math.max(0, smoothedEstimatedTime - elapsedTime) : 0;
+  
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -213,10 +219,10 @@ const ProgressModalDynamic = ({ isVisible, progress, totalPlans = 3, onCancel, o
           </div>
 
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            AIが旅行プランを作成中...
+            {customTitle}
           </h3>
           <p className="text-gray-600 mb-2">
-            あなたの理想の旅程を生成しています
+            {customSubtitle}
           </p>
           <p className="text-sm text-blue-600 font-medium">
             {getCurrentActivity()}
@@ -234,56 +240,36 @@ const ProgressModalDynamic = ({ isVisible, progress, totalPlans = 3, onCancel, o
                 style={{ width: `${progressPercentage}%` }}
               />
             </div>
-            <div className="text-center text-sm text-gray-600 mt-2">
-              {getStatusText()}
-            </div>
-            {!isCalculating && timePerPlan && (
-              <div className="text-center text-xs text-gray-500 mt-1">
-                プラン平均生成時間: {formatTime(timePerPlan)}
-              </div>
-            )}
           </div>
 
           {/* 時間情報 */}
-          <div className="flex justify-between text-sm text-gray-500 mb-6">
-            <div className="text-center flex-1">
+          <div className="flex justify-center text-sm text-gray-500 mb-6">
+            <div className="text-center">
               <span className="block font-medium text-gray-700">経過時間</span>
               <span className="text-lg font-semibold text-blue-600">{formatTime(elapsedTime)}</span>
             </div>
-            {!isCalculating && (
-              <div className="text-center flex-1">
-                <span className="block font-medium text-gray-700">残り時間</span>
-                <span className="text-lg font-semibold text-orange-600">{formatTime(remainingTime)}</span>
-              </div>
-            )}
           </div>
 
-          {/* プラン生成状況 */}
-          <div className="text-left bg-gray-50 rounded-lg p-4 mb-6">
-            <div className="text-sm font-medium text-gray-700 mb-2">プラン生成状況</div>
-            <div className="space-y-2">
-              {Array.from({ length: totalPlans }, (_, index) => (
-                <div key={index} className={`flex items-center text-sm ${
-                  plansReceived > index ? 'text-green-600' : 'text-gray-400'
-                }`}>
-                  <div className={`w-2 h-2 rounded-full mr-3 ${
-                    plansReceived > index ? 'bg-green-500' : 'bg-gray-300'
-                  }`}></div>
-                  プラン {index + 1}
-                  {plansReceived > index && <span className="ml-2 text-xs">✓</span>}
-                  {plansReceived === index && <span className="ml-2 text-xs animate-pulse">生成中...</span>}
-                </div>
-              ))}
-            </div>
-            
-            {timePerPlan && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <div className="text-xs text-gray-500">
-                  平均生成時間: {formatTime(timePerPlan)}
-                </div>
+          {/* プラン生成状況（totalPlans > 1の場合のみ表示）*/}
+          {totalPlans > 1 && (
+            <div className="text-left bg-gray-50 rounded-lg p-4 mb-6">
+              <div className="text-sm font-medium text-gray-700 mb-2">プラン生成状況</div>
+              <div className="space-y-2">
+                {Array.from({ length: totalPlans }, (_, index) => (
+                  <div key={index} className={`flex items-center text-sm ${
+                    plansReceived > index ? 'text-green-600' : 'text-gray-400'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full mr-3 ${
+                      plansReceived > index ? 'bg-green-500' : 'bg-gray-300'
+                    }`}></div>
+                    プラン {index + 1}
+                    {plansReceived > index && <span className="ml-2 text-xs">✓</span>}
+                    {plansReceived === index && <span className="ml-2 text-xs animate-pulse">生成中...</span>}
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {onCancel && (
             <button
