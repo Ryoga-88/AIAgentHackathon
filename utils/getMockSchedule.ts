@@ -1,6 +1,7 @@
-// utils/getMockSchedule.js
+// utils/getMockSchedule.ts
+import { TravelSchedule } from '@/types/travel';
 
-export function getMockSchedule() {
+export function getMockSchedule(): TravelSchedule {
   return {
     "trip_id": "shirakawa_takayama_2024",
     "theme": "wabi_sabi",

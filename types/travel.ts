@@ -27,7 +27,7 @@ export interface Activity {
   time: string;
   title: string;
   subtitle: string;
-  type: 'heritage' | 'culinary' | 'experience' | 'scenic' | 'cultural' | 'art' | 'nature' | 'wellness' | 'adventure' | 'beach';
+  type: 'heritage' | 'nature' | 'experience' | 'culinary' | 'scenic' | 'cultural' | 'art' | 'wellness' | 'adventure' | 'beach';
   priority: 'must_see' | 'must_do' | 'recommended' | 'optional';
   image: string;
   description: string;
