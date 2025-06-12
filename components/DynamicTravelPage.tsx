@@ -4,6 +4,7 @@ import { getMockSchedule } from '@/utils/getMockSchedule';
 import { TravelHero } from './blocks/TravelHero';
 import { DaySchedule } from './blocks/DaySchedule';
 import { ThemeProvider } from './providers/ThemeProvider';
+import { DaySchedule as DayScheduleType } from '@/types/travel';
 
 export function DynamicTravelPage() {
   const scheduleData = getMockSchedule();
@@ -33,7 +34,7 @@ export function DynamicTravelPage() {
           {/* 日程ページ */}
           {scheduleData.itinerary.map((dayData, index) => (
             <div key={index} className="flex-shrink-0 a4-page">
-              <DaySchedule data={dayData} />
+              <DaySchedule data={dayData as DayScheduleType} />
             </div>
           ))}
         </div>
