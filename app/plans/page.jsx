@@ -463,177 +463,176 @@ export default function PlansPage() {
                               </div>
                             </div>
                           </div>
-                        );
-                          })}
+                        ))}
                       </div>
 
-                        {/* 1日の経路マップ */}
-                        {routeData[plan.trip_id]?.[`day_${day.day}`] && (
-                          <div className="mt-4">
-                            <h5 className="font-medium text-gray-900 mb-2 flex items-center">
+                      {/* 1日の経路マップ */}
+                      {routeData[selectedPlanData.trip_id]?.[`day_${day.day}`] && (
+                        <div className="mt-4">
+                          <h5 className="font-medium text-gray-900 mb-2 flex items-center">
+                            <span className="mr-2">🗺️</span>
+                            Day {day.day} の移動ルート
+                          </h5>
+                          <InteractiveMap
+                            staticMapUrl={routeData[selectedPlanData.trip_id][`day_${day.day}`].static_map_url}
+                            routeInfo={routeData[selectedPlanData.trip_id][`day_${day.day}`].route}
+                            height="250px"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Interactive Route Map */}
+                {routeData[selectedPlanData.trip_id]?.overall && (
+                  <div className="mt-8">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">全体旅行ルート</h3>
+                    <div className="bg-white rounded-xl shadow-md p-6">
+                      <InteractiveMap
+                        staticMapUrl={routeData[selectedPlanData.trip_id].overall.static_map_url}
+                        routeInfo={routeData[selectedPlanData.trip_id].overall.route}
+                        height="300px"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Recommended Hotels */}
+                <div className="mt-8">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">おすすめホテル</h3>
+                  {hotels[selectedPlanData.trip_id] && hotels[selectedPlanData.trip_id].length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {hotels[selectedPlanData.trip_id].map((hotel) => (
+                        <div key={hotel.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                          <div className="relative">
+                            <img
+                              src={hotel.image}
+                              alt={hotel.name}
+                              className="w-full h-40 object-cover"
+                            />
+                            <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                              ホテル
+                            </div>
+                          </div>
+                          <div className="p-5">
+                            <h4 className="font-bold text-gray-900 mb-2 text-lg leading-tight">{hotel.name}</h4>
+                            <p className="text-sm text-gray-600 mb-3 flex items-center">
+                              <span className="mr-1">📍</span>
+                              {hotel.location}
+                            </p>
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center space-x-1">
+                                <div className="flex text-yellow-400">
+                                  {[...Array(5)].map((_, i) => (
+                                    <span key={i} className={i < Math.floor(hotel.rating) ? 'text-yellow-400' : 'text-gray-300'}>
+                                      ⭐
+                                    </span>
+                                  ))}
+                                </div>
+                                <span className="text-sm text-gray-600 ml-1">
+                                  {hotel.rating} ({hotel.reviewCount}件)
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xl font-bold text-blue-600">{hotel.price}</span>
+                              <a
+                                href={hotel.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                              >
+                                詳細を見る
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="flex items-center">
+                        <span className="text-yellow-600 mr-2">⚠️</span>
+                        <p className="text-yellow-800">
+                          この地域のホテル情報を取得中です。しばらくお待ちください。
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Location Information */}
+                {locationData[selectedPlanData.hero.title] && (
+                  <div className="mt-8">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">エリア情報</h3>
+                    <div className="bg-white rounded-xl shadow-md p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {locationData[selectedPlanData.hero.title].map_image_url && (
+                          <div className="space-y-2">
+                            <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
                               <span className="mr-2">🗺️</span>
-                              Day {day.day} の移動ルート
-                            </h5>
-                            <InteractiveMap
-                              staticMapUrl={routeData[plan.trip_id][`day_${day.day}`].static_map_url}
-                              routeInfo={routeData[plan.trip_id][`day_${day.day}`].route}
-                              height="250px"
+                              位置情報
+                            </h4>
+                            <div className="relative group">
+                              <img
+                                src={locationData[selectedPlanData.hero.title].map_image_url}
+                                alt={`${selectedPlanData.hero.title}の地図`}
+                                className="w-full h-48 object-cover rounded-lg cursor-pointer group-hover:opacity-90 transition-opacity"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black bg-opacity-30 rounded-lg">
+                                <span className="text-white font-medium">Google Mapsで開く</span>
+                              </div>
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedPlanData.hero.title)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="absolute inset-0"
+                              >
+                                <span className="sr-only">Google Mapsで{selectedPlanData.hero.title}を開く</span>
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                        {locationData[selectedPlanData.hero.title].photo_url && (
+                          <div className="space-y-2">
+                            <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                              <span className="mr-2">📸</span>
+                              現地の風景
+                            </h4>
+                            <img
+                              src={locationData[selectedPlanData.hero.title].photo_url}
+                              alt={selectedPlanData.hero.title}
+                              className="w-full h-48 object-cover rounded-lg shadow-sm"
                             />
                           </div>
                         )}
-                    </div>
-                  </div>
-
-                  {/* Interactive Route Map */}
-                  {routeData[plan.trip_id]?.overall && (
-                    <div className="mt-8">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-4">全体旅行ルート</h3>
-                      <div className="bg-white rounded-xl shadow-md p-6">
-                        <InteractiveMap
-                          staticMapUrl={routeData[plan.trip_id].overall.static_map_url}
-                          routeInfo={routeData[plan.trip_id].overall.route}
-                          height="300px"
-                        />
                       </div>
-                    </div>
-                  )}
-
-                  {/* Recommended Hotels */}
-                  <div className="mt-8">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">おすすめホテル</h3>
-                    {hotels[plan.trip_id] && hotels[plan.trip_id].length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {hotels[plan.trip_id].map((hotel) => (
-                          <div key={hotel.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                            <div className="relative">
-                              <img
-                                src={hotel.image}
-                                alt={hotel.name}
-                                className="w-full h-40 object-cover"
-                              />
-                              <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
-                                ホテル
-                              </div>
-                            </div>
-                            <div className="p-5">
-                              <h4 className="font-bold text-gray-900 mb-2 text-lg leading-tight">{hotel.name}</h4>
-                              <p className="text-sm text-gray-600 mb-3 flex items-center">
-                                <span className="mr-1">📍</span>
-                                {hotel.location}
-                              </p>
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center space-x-1">
-                                  <div className="flex text-yellow-400">
-                                    {[...Array(5)].map((_, i) => (
-                                      <span key={i} className={i < Math.floor(hotel.rating) ? 'text-yellow-400' : 'text-gray-300'}>
-                                        ⭐
-                                      </span>
-                                    ))}
-                                  </div>
-                                  <span className="text-sm text-gray-600 ml-1">
-                                    {hotel.rating} ({hotel.reviewCount}件)
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-xl font-bold text-blue-600">{hotel.price}</span>
-                                <a
-                                  href={hotel.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-                                >
-                                  詳細を見る
-                                </a>
-                              </div>
-                            </div>
+                      <div className="mt-6 pt-4 border-t border-gray-200">
+                        <div className="flex items-start space-x-2">
+                          <span className="text-blue-600 mt-0.5">📍</span>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">住所</p>
+                            <p className="text-sm text-gray-600">
+                              {locationData[selectedPlanData.hero.title].formatted_address}
+                            </p>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                        <div className="flex items-center">
-                          <span className="text-yellow-600 mr-2">⚠️</span>
-                          <p className="text-yellow-800">
-                            この地域のホテル情報を取得中です。しばらくお待ちください。
-                          </p>
                         </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Location Information */}
-                  {locationData[plan.hero.title] && (
-                    <div className="mt-8">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-4">エリア情報</h3>
-                      <div className="bg-white rounded-xl shadow-md p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {locationData[plan.hero.title].map_image_url && (
-                            <div className="space-y-2">
-                              <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                                <span className="mr-2">🗺️</span>
-                                位置情報
-                              </h4>
-                              <div className="relative group">
-                                <img
-                                  src={locationData[plan.hero.title].map_image_url}
-                                  alt={`${plan.hero.title}の地図`}
-                                  className="w-full h-48 object-cover rounded-lg cursor-pointer group-hover:opacity-90 transition-opacity"
-                                />
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black bg-opacity-30 rounded-lg">
-                                  <span className="text-white font-medium">Google Mapsで開く</span>
-                                </div>
-                                <a
-                                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(plan.hero.title)}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="absolute inset-0"
-                                >
-                                  <span className="sr-only">Google Mapsで{plan.hero.title}を開く</span>
-                                </a>
-                              </div>
-                            </div>
-                          )}
-                          {locationData[plan.hero.title].photo_url && (
-                            <div className="space-y-2">
-                              <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                                <span className="mr-2">📸</span>
-                                現地の風景
-                              </h4>
-                              <img
-                                src={locationData[plan.hero.title].photo_url}
-                                alt={plan.hero.title}
-                                className="w-full h-48 object-cover rounded-lg shadow-sm"
-                              />
-                            </div>
-                          )}
-                        </div>
-                        <div className="mt-6 pt-4 border-t border-gray-200">
-                          <div className="flex items-start space-x-2">
-                            <span className="text-blue-600 mt-0.5">📍</span>
+                        {locationData[selectedPlanData.hero.title].coordinates && (
+                          <div className="flex items-start space-x-2 mt-3">
+                            <span className="text-green-600 mt-0.5">🌐</span>
                             <div>
-                              <p className="text-sm font-medium text-gray-900">住所</p>
+                              <p className="text-sm font-medium text-gray-900">座標</p>
                               <p className="text-sm text-gray-600">
-                                {locationData[plan.hero.title].formatted_address}
+                                {locationData[selectedPlanData.hero.title].coordinates.lat.toFixed(6)}, {locationData[selectedPlanData.hero.title].coordinates.lng.toFixed(6)}
                               </p>
                             </div>
                           </div>
-                          {locationData[plan.hero.title].coordinates && (
-                            <div className="flex items-start space-x-2 mt-3">
-                              <span className="text-green-600 mt-0.5">🌐</span>
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">座標</p>
-                                <p className="text-sm text-gray-600">
-                                  {locationData[plan.hero.title].coordinates.lat.toFixed(6)}, {locationData[plan.hero.title].coordinates.lng.toFixed(6)}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
                     </div>
-                  )}
-                ))}
+                  </div>
+                )}
               </div>
             </div>
 
