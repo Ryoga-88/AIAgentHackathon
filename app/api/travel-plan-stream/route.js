@@ -301,47 +301,128 @@ export async function POST(request) {
           sendProgress(40, '最適なルートを計算中...');
           await new Promise(resolve => setTimeout(resolve, 2000));
 
-          sendProgress(60, 'アクティビティを選定中...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // 3つのプランを個別に生成
+          const generateSinglePlan = async (planType, planNumber, progressStart, progressEnd) => {
+            const singlePlanPrompt = `
+あなたは旅行プランの専門家です。以下の条件に基づいて、詳細な旅行プランを1つ作成してください。
 
-          // OpenAI API呼び出し
-          const response = await client.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-              { 
-                role: "system", 
-                content: "あなたは旅行プランの専門家です。指定されたJSON形式で3つのプランを正確に出力してください。" 
-              },
-              { role: "user", content: filledPrompt }
-            ],
-            response_format: { type: "json_object" },
-          });
+**基本条件:**
+- 目的地: ${destination}
+- 日付: ${date}
+- 季節: ${season}
+- 季節の考慮事項: ${seasonal_considerations}
+- 予算: ${budget}
+- 人数: ${number_of_people}
+- 興味: ${interests}
+- その他の要望: ${additional_requests}
+- プランタイプ: ${planType}
 
-          sendProgress(80, 'プランの最終調整中...');
+**プランタイプ別の特別配慮:**
+${planType === 'sunny_outdoor' ? '- 屋外活動を中心とした晴天時向けプラン（自然観光、アウトドア体験、屋外グルメなど）' : ''}
+${planType === 'sunny_cultural' ? '- 晴天時向けの文化・歴史中心プラン（寺社仏閣、美術館、伝統体験、街歩きなど）' : ''}
+${planType === 'rainy_indoor' ? '- 屋内活動を中心とした雨天時向けプラン（屋内観光、ショッピング、屋内エンターテイメントなど）' : ''}
+
+**参加者の個別要望:**
+${participantsPreferences}
+
+**重要な制約事項:**
+- 同じアクティビティや同じ場所への訪問は一度のみとしてください
+- 各日の活動場所やアクティビティは全て異なるものにしてください
+- 最新の観光情報や営業時間を考慮して、実用的なプランを作成してください
+
+**出力形式:**
+以下の形式のJSONで1つのプランを出力してください：
+{
+  "plan_number": ${planNumber},
+  "trip_id": "${destination}_${planType}_${Date.now()}",
+  "weather_type": "${planType.includes('rainy') ? 'rainy' : 'sunny'}",
+  "theme": "旅行のテーマ",
+  "theme_description": "このプランのテーマの説明",
+  "hero": {
+    "title": "メインタイトル",
+    "subtitle": "サブタイトル・キャッチフレーズ",
+    "destination": "${destination}",
+    "date": "${date}",
+    "budget": "${budget}",
+    "highlights": ["ハイライト1", "ハイライト2", "ハイライト3"]
+  },
+  "itinerary": [
+    {
+      "day": 1,
+      "date": "YYYY-MM-DD",
+      "city": {
+        "name": "都市名（日本語）",
+        "name_en": "City Name (English)",
+        "description": "都市の説明・特徴"
+      },
+      "activities": [
+        {
+          "id": "アクティビティID",
+          "time": "HH:MM - HH:MM",
+          "title": "アクティビティのタイトル",
+          "subtitle": "アクティビティのサブタイトル",
+          "type": "heritage/culinary/experience/scenic等",
+          "priority": "must_see/must_do/recommended等",
+          "description": "詳細な説明",
+          "location": "場所の名称",
+          "price": "料金",
+          "rating": 4.5,
+          "tips": "おすすめのポイント",
+          "activity_english": "Activity description (English)",
+          "image_search_term": "City Name + Activity in English",
+          "category": "sightseeing/food/activity/shopping等",
+          "is_free": false
+        }
+      ],
+      "accommodation": "宿泊予定の場所"
+    }
+  ]
+}`;
+
+            const response = await client.chat.completions.create({
+              model: "gpt-4o-2024-11-20", // GPT-4o-search-previewを使用
+              messages: [
+                { 
+                  role: "system", 
+                  content: "あなたは旅行プランの専門家です。最新の観光情報を検索して、詳細で実用的な旅行プランを作成してください。指定されたJSON形式で正確に出力してください。" 
+                },
+                { role: "user", content: singlePlanPrompt }
+              ],
+              response_format: { type: "json_object" },
+              max_tokens: 4000,
+            });
+
+            const messageContent = response.choices[0]?.message?.content;
+            if (!messageContent) {
+              throw new Error(`No content received for plan ${planNumber}`);
+            }
+
+            return JSON.parse(messageContent);
+          };
+
+          // プラン1: 屋外活動中心
+          sendProgress(40, 'プラン1（屋外活動）を作成中...');
+          const plan1 = await generateSinglePlan('sunny_outdoor', 1, 40, 55);
+          
+          // プラン2: 文化・歴史中心
+          sendProgress(55, 'プラン2（文化・歴史）を作成中...');
+          const plan2 = await generateSinglePlan('sunny_cultural', 2, 55, 75);
+          
+          // プラン3: 屋内活動中心
+          sendProgress(75, 'プラン3（屋内活動）を作成中...');
+          const plan3 = await generateSinglePlan('rainy_indoor', 3, 75, 85);
+
+          const plans = [plan1, plan2, plan3];
+
+          sendProgress(85, 'プランの最終調整中...');
           await new Promise(resolve => setTimeout(resolve, 1000));
 
-          // レスポンスの検証
-          const messageContent = response.choices[0]?.message?.content;
-
-          if (!messageContent) {
-            throw new Error('No content received from OpenAI API');
-          }
-
-          // JSONレスポンスをパース
-          let parsedJSON;
-          try {
-            parsedJSON = JSON.parse(messageContent);
-          } catch (error) {
-            console.error('JSON parsing error:', error);
-            throw new Error('Failed to parse JSON from API response');
-          }
-
-          let travelPlans = parsedJSON;
-          
-          // プラン形式の基本構造検証
-          if (!travelPlans.plans || !Array.isArray(travelPlans.plans)) {
-            throw new Error('Invalid travel plans structure - missing plans array');
-          }
+          // 各プランの構造検証
+          plans.forEach((plan, index) => {
+            if (!plan.trip_id || !plan.theme || !plan.hero || !plan.itinerary || !Array.isArray(plan.itinerary)) {
+              throw new Error(`Invalid structure in plan ${index + 1}`);
+            }
+          });
 
           sendProgress(100, '完了しました！');
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -349,7 +430,7 @@ export async function POST(request) {
           // 完了データを送信
           const completeData = JSON.stringify({
             type: 'complete',
-            plans: travelPlans.plans
+            plans: plans
           });
           controller.enqueue(encoder.encode(`data: ${completeData}\n\n`));
 

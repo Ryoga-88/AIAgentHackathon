@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 // OpenAI クライアントの初期化（APIキーがない場合はnull）
 let client = null;
@@ -10,7 +10,7 @@ try {
     });
   }
 } catch (error) {
-  console.log('OpenAI client initialization failed:', error.message);
+  console.log("OpenAI client initialization failed:", error.message);
 }
 
 // デフォルトのプロンプトテンプレート
@@ -187,94 +187,212 @@ export async function PUT(request) {
   try {
     const body = await request.json();
     const { promptTemplate } = body;
-    
+
     if (!promptTemplate) {
       return NextResponse.json(
-        { error: 'promptTemplate is required' },
+        { error: "promptTemplate is required" },
         { status: 400 }
       );
     }
-    
+
     currentPromptTemplate = promptTemplate;
-    return NextResponse.json({ message: 'Prompt template updated successfully' });
+    return NextResponse.json({
+      message: "Prompt template updated successfully",
+    });
   } catch (error) {
-    console.error('Error updating prompt template:', error);
+    console.error("Error updating prompt template:", error);
     return NextResponse.json(
-      { error: 'Failed to update prompt template', message: error.message },
+      { error: "Failed to update prompt template", message: error.message },
       { status: 500 }
     );
   }
 }
 
-// POST: 旅行プランを生成
+// 単一プラン生成用ヘルパー関数
+async function generateSinglePlan(requestData, planType, planNumber) {
+  const singlePlanPrompt = `
+あなたは旅行プランの専門家です。以下の条件に基づいて、詳細な旅行プランを1つ作成してください。
+
+**基本条件:**
+- 目的地: ${requestData.destination}
+- 日付: ${requestData.date}
+- 季節: ${requestData.season}
+- 季節の考慮事項: ${requestData.seasonal_considerations}
+- 予算: ${requestData.budget}
+- 人数: ${requestData.number_of_people}
+- 興味: ${requestData.interests}
+- その他の要望: ${requestData.additional_requests}
+- プランタイプ: ${planType}
+
+**プランタイプ別の特別配慮:**
+${
+  planType === "sunny_outdoor"
+    ? "- 屋外活動を中心とした晴天時向けプラン（自然観光、アウトドア体験、屋外グルメなど）"
+    : ""
+}
+${
+  planType === "sunny_cultural"
+    ? "- 晴天時向けの文化・歴史中心プラン（寺社仏閣、美術館、伝統体験、街歩きなど）"
+    : ""
+}
+${
+  planType === "rainy_indoor"
+    ? "- 屋内活動を中心とした雨天時向けプラン（屋内観光、ショッピング、屋内エンターテイメントなど）"
+    : ""
+}
+
+**参加者の個別要望:**
+${requestData.participants_preferences}
+
+**重要な制約事項:**
+- 同じアクティビティや同じ場所への訪問は一度のみとしてください
+- 各日の活動場所やアクティビティは全て異なるものにしてください
+- 最新の観光情報や営業時間を考慮して、実用的なプランを作成してください
+
+**出力形式:**
+以下の形式のJSONで1つのプランを出力してください：
+{
+  "plan_number": ${planNumber},
+  "trip_id": "${requestData.destination}_${planType}_${Date.now()}",
+  "weather_type": "${planType.includes("rainy") ? "rainy" : "sunny"}",
+  "theme": "旅行のテーマ",
+  "theme_description": "このプランのテーマの説明",
+  "hero": {
+    "title": "メインタイトル",
+    "subtitle": "サブタイトル・キャッチフレーズ",
+    "destination": "${requestData.destination}",
+    "date": "${requestData.date}",
+    "budget": "${requestData.budget}",
+    "highlights": ["ハイライト1", "ハイライト2", "ハイライト3"]
+  },
+  "itinerary": [
+    {
+      "day": 1,
+      "date": "YYYY-MM-DD",
+      "city": {
+        "name": "都市名（日本語）",
+        "name_en": "City Name (English)",
+        "description": "都市の説明・特徴"
+      },
+      "activities": [
+        {
+          "id": "アクティビティID",
+          "time": "HH:MM - HH:MM",
+          "title": "アクティビティのタイトル",
+          "subtitle": "アクティビティのサブタイトル",
+          "type": "heritage/culinary/experience/scenic等",
+          "priority": "must_see/must_do/recommended等",
+          "description": "詳細な説明",
+          "location": "場所の名称",
+          "price": "料金",
+          "rating": 4.5,
+          "tips": "おすすめのポイント",
+          "activity_english": "Activity description (English)",
+          "image_search_term": "City Name + Activity in English",
+          "category": "sightseeing/food/activity/shopping等",
+          "is_free": false
+        }
+      ],
+      "accommodation": "宿泊予定の場所"
+    }
+  ]
+}`;
+
+  const response = await client.chat.completions.create({
+    model: "gpt-4o-search-preview-2025-03-11", // GPT-4o-search-previewを使用
+    messages: [
+      {
+        role: "system",
+        content:
+          "あなたは旅行プランの専門家です。最新の観光情報を検索して、詳細で実用的な旅行プランを作成してください。指定されたJSON形式で正確に出力してください。",
+      },
+      { role: "user", content: singlePlanPrompt },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 4000,
+  });
+
+  const messageContent = response.choices[0]?.message?.content;
+  if (!messageContent) {
+    throw new Error(`No content received for plan ${planNumber}`);
+  }
+
+  return JSON.parse(messageContent);
+}
+
+// POST: 旅行プランを生成（プランごとに分離）
 export async function POST(request) {
   try {
     // OpenAI APIキーのチェック
     if (!client) {
-      console.log('OpenAI API key not configured, returning mock data');
-      // APIキーがない場合はモックデータを返す
-      const { getMockPlans } = await import('../../../data/mockData');
+      console.log("OpenAI API key not configured, returning mock data");
+      const { getMockPlans } = await import("../../../data/mockData");
       const mockPlans = getMockPlans();
       return NextResponse.json({ plans: mockPlans.slice(0, 3) });
     }
 
     const body = await request.json();
-    
+
     // リクエストからパラメータを取得
-    const { 
-      destination, 
-      date, 
+    const {
+      destination,
+      date,
       season,
       seasonal_considerations,
-      budget, 
-      number_of_people, 
-      interests, 
-      additional_requests, 
-      customPrompt,
-      participants // 新しい複数人対応パラメータ
+      budget,
+      number_of_people,
+      interests,
+      additional_requests,
+      participants,
     } = body;
-    
+
     // 必須パラメータの検証
     if (!destination) {
       return NextResponse.json(
-        { error: 'destination is required' },
+        { error: "destination is required" },
         { status: 400 }
       );
     }
-    
-    // 参加者の要望を統合する関数
+
+    // 参加者の要望をフォーマット
     function formatParticipantsPreferences(participants) {
-      if (!participants || !Array.isArray(participants) || participants.length === 0) {
-        return '特になし';
+      if (
+        !participants ||
+        !Array.isArray(participants) ||
+        participants.length === 0
+      ) {
+        return "特になし";
       }
-      
-      return participants.map((participant, index) => {
-        const name = participant.name || `参加者${index + 1}`;
-        const age = participant.age ? `（${participant.age}歳）` : '';
-        const wishes = participant.wishes || [];
-        const interests = participant.interests || [];
-        const restrictions = participant.restrictions || [];
-        
-        let participantInfo = `**${name}${age}:**\n`;
-        
-        if (wishes.length > 0) {
-          participantInfo += `- 行きたい場所: ${wishes.join(', ')}\n`;
-        }
-        
-        if (interests.length > 0) {
-          participantInfo += `- 興味・関心: ${interests.join(', ')}\n`;
-        }
-        
-        if (restrictions.length > 0) {
-          participantInfo += `- 制約・配慮事項: ${restrictions.join(', ')}\n`;
-        }
-        
-        if (participant.budget) {
-          participantInfo += `- 個人予算: ${participant.budget}\n`;
-        }
-        
-        return participantInfo;
-      }).join('\n');
+
+      return participants
+        .map((participant, index) => {
+          const name = participant.name || `参加者${index + 1}`;
+          const age = participant.age ? `（${participant.age}歳）` : "";
+          const wishes = participant.wishes || [];
+          const interests = participant.interests || [];
+          const restrictions = participant.restrictions || [];
+
+          let participantInfo = `**${name}${age}:**\n`;
+
+          if (wishes.length > 0) {
+            participantInfo += `- 行きたい場所: ${wishes.join(", ")}\n`;
+          }
+
+          if (interests.length > 0) {
+            participantInfo += `- 興味・関心: ${interests.join(", ")}\n`;
+          }
+
+          if (restrictions.length > 0) {
+            participantInfo += `- 制約・配慮事項: ${restrictions.join(", ")}\n`;
+          }
+
+          if (participant.budget) {
+            participantInfo += `- 個人予算: ${participant.budget}\n`;
+          }
+
+          return participantInfo;
+        })
+        .join("\n");
     }
     
     // カスタムプロンプトが提供された場合は使用
@@ -286,10 +404,10 @@ export async function POST(request) {
     // プロンプトにパラメータを埋め込む
     let filledPrompt = promptToUse
       .replace('{{destination}}', destination || '')
-      .replace('{{date}}', date || '日程未指定（適切な期間を設定してください）')
-      .replace('{{season}}', season || '年間を通して楽しめる')
-      .replace('{{seasonal_considerations}}', seasonal_considerations || '特になし')
-      .replace('{{budget}}', budget || '一般的な予算（適切な金額を設定してください）')
+      .replace('{{date}}', date || '')
+      .replace('{{season}}', season || '')
+      .replace('{{seasonal_considerations}}', seasonal_considerations || '')
+      .replace('{{budget}}', budget || '')
       .replace('{{number_of_people}}', number_of_people || '')
       .replace('{{interests}}', interests || '')
       .replace('{{additional_requests}}', additional_requests || '')
@@ -339,31 +457,33 @@ export async function POST(request) {
     }
     
     // 各プランの構造検証
-    travelPlans.plans.forEach((plan, index) => {
-      if (!plan.trip_id || !plan.theme || !plan.hero || !plan.itinerary || !Array.isArray(plan.itinerary)) {
+    travelPlans.forEach((plan, index) => {
+      if (
+        !plan.trip_id ||
+        !plan.theme ||
+        !plan.hero ||
+        !plan.itinerary ||
+        !Array.isArray(plan.itinerary)
+      ) {
         throw new Error(`Invalid structure in plan ${index + 1}`);
       }
     });
-    
-    return NextResponse.json(travelPlans);
-    
+
+    return NextResponse.json({ plans });
   } catch (error) {
-    console.error('Error generating travel plan:', error);
-    
+    console.error("Error generating travel plan:", error);
+
     // エラーの種類に応じたレスポンス
     if (error.status === 401) {
-      return NextResponse.json(
-        { error: 'Invalid API key' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
     } else if (error.status === 429) {
       return NextResponse.json(
-        { error: 'Rate limit exceeded' },
+        { error: "Rate limit exceeded" },
         { status: 429 }
       );
     } else {
       return NextResponse.json(
-        { error: 'Travel plan generation failed', message: error.message },
+        { error: "Travel plan generation failed", message: error.message },
         { status: 500 }
       );
     }
