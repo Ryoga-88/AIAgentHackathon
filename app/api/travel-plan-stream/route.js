@@ -27,6 +27,10 @@ const defaultPromptTemplate = `
 - 興味: {{interests}}
 - その他の要望: {{additional_requests}}
 
+**日程・予算について:**
+- 日程が指定されていない場合は、目的地に適した一般的な旅行期間（2〜3日程度）でプランを作成してください
+- 予算が指定されていない場合は、目的地とアクティビティに適した一般的な予算設定でプランを作成してください
+
 **季節に応じた特別配慮:**
 - 旅行時期（{{season}}）に最適な服装、持ち物、アクティビティを考慮してください
 - 季節特有のイベント、見どころ、グルメを積極的に取り入れてください
@@ -65,6 +69,12 @@ const defaultPromptTemplate = `
 - 最終日以外の各日には、その夜泊まる宿泊地名を{accommodation}フィールドに出力してください
 - 最終日は出発日のため{accommodation}は"出発日のため宿泊なし"または空文字列にしてください
 - 海外の場合は都市名・地域名に加えて国名も含めてください
+
+**経路探索用の場所情報について:**
+- 各アクティビティに "search_query" フィールドを必ず追加してください
+- 具体的な観光地・施設がある場合：正確な場所名 + 地域名（例："清水寺 京都市", "函館山 北海道"）
+- 抽象的な活動の場合：空文字列 ""
+- 必ず実在する場所のみを記載し、不確実な場合は search_query を空文字列にしてください
 
 **その他の要件:**
 - 一般的な観光情報に基づいて、実用的なプランを作成してください
@@ -121,6 +131,7 @@ const defaultPromptTemplate = `
               "priority": "優先度（must_see, must_do, recommended等）",
               "description": "詳細な説明",
               "location": "場所の名称",
+              "search_query": "Google Maps検索用クエリ（具体的な場所がある場合のみ、ない場合は空文字列）",
               "price": "料金",
               "rating": "評価（数値）",
               "tips": "おすすめのポイントやコツ",
@@ -150,6 +161,17 @@ const defaultPromptTemplate = `
     }
   ]
 }
+
+**search_query の具体例:**
+- 具体的な観光地：
+  - "清水寺 京都市東山区"
+  - "東京スカイツリー 墨田区"
+  - "函館山ロープウェイ 函館市"
+  - "金閣寺 京都市北区"
+  - "浅草寺 台東区"
+- 抽象的な活動：
+  - ""（空文字列）
+  - 例：温泉街散策、ショッピング、自然散策、海岸ドライブなど
 `;
 
 // ストリーミング対応のPOSTエンドポイント
@@ -267,10 +289,10 @@ export async function POST(request) {
           // プロンプトにパラメータを埋め込む
           let filledPrompt = promptToUse
             .replace('{{destination}}', destination || '')
-            .replace('{{date}}', date || '')
-            .replace('{{season}}', season || '')
-            .replace('{{seasonal_considerations}}', seasonal_considerations || '')
-            .replace('{{budget}}', budget || '')
+            .replace('{{date}}', date || '日程未指定（適切な期間を設定してください）')
+            .replace('{{season}}', season || '年間を通して楽しめる')
+            .replace('{{seasonal_considerations}}', seasonal_considerations || '特になし')
+            .replace('{{budget}}', budget || '一般的な予算（適切な金額を設定してください）')
             .replace('{{number_of_people}}', number_of_people || '')
             .replace('{{interests}}', interests || '')
             .replace('{{additional_requests}}', additional_requests || '')
