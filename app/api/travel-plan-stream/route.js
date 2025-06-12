@@ -152,48 +152,19 @@ const defaultPromptTemplate = `
 }
 `;
 
-// プロンプトテンプレートを保存する変数
-let currentPromptTemplate = defaultPromptTemplate;
-
-// GET: プロンプトテンプレートを取得
-export async function GET() {
-  return NextResponse.json({ promptTemplate: currentPromptTemplate });
-}
-
-// PUT: プロンプトテンプレートを更新
-export async function PUT(request) {
-  try {
-    const body = await request.json();
-    const { promptTemplate } = body;
-    
-    if (!promptTemplate) {
-      return NextResponse.json(
-        { error: 'promptTemplate is required' },
-        { status: 400 }
-      );
-    }
-    
-    currentPromptTemplate = promptTemplate;
-    return NextResponse.json({ message: 'Prompt template updated successfully' });
-  } catch (error) {
-    console.error('Error updating prompt template:', error);
-    return NextResponse.json(
-      { error: 'Failed to update prompt template', message: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-// POST: 旅行プランを生成
+// ストリーミング対応のPOSTエンドポイント
 export async function POST(request) {
   try {
     // OpenAI APIキーのチェック
     if (!client) {
       console.log('OpenAI API key not configured, returning mock data');
       // APIキーがない場合はモックデータを返す
-      const { getMockPlans } = await import('../../../data/mockData');
-      const mockPlans = getMockPlans();
-      return NextResponse.json({ plans: mockPlans.slice(0, 3) });
+      return new Response(JSON.stringify({
+        type: 'complete',
+        plans: []
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     const body = await request.json();
@@ -209,141 +180,187 @@ export async function POST(request) {
       interests, 
       additional_requests, 
       customPrompt,
-      participants // 新しい複数人対応パラメータ
+      participants,
+      duration
     } = body;
     
     // 必須パラメータの検証
     if (!destination) {
-      return NextResponse.json(
-        { error: 'destination is required' },
-        { status: 400 }
-      );
+      return new Response(JSON.stringify({
+        type: 'error',
+        message: 'destination is required'
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
+
+    // 推定処理時間の計算（日数 × 1分）
+    const estimatedTimeMinutes = duration || 3; // デフォルト3分
+    const estimatedTimeSeconds = estimatedTimeMinutes * 60;
+
+    // ストリーミングレスポンスの設定
+    const encoder = new TextEncoder();
     
-    // 参加者の要望を統合する関数
-    function formatParticipantsPreferences(participants) {
-      if (!participants || !Array.isArray(participants) || participants.length === 0) {
-        return '特になし';
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // 進捗を段階的に送信
+          const sendProgress = (progress, message) => {
+            const data = JSON.stringify({
+              type: 'progress',
+              progress,
+              message,
+              estimatedTime: estimatedTimeSeconds
+            });
+            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+          };
+
+          // 初期進捗
+          sendProgress(0, 'リクエスト情報を解析中...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // 参加者の要望を統合する関数
+          function formatParticipantsPreferences(participants) {
+            if (!participants || !Array.isArray(participants) || participants.length === 0) {
+              return '特になし';
+            }
+            
+            return participants.map((participant, index) => {
+              const name = participant.name || `参加者${index + 1}`;
+              const age = participant.age ? `（${participant.age}歳）` : '';
+              const wishes = participant.wishes || [];
+              const interests = participant.interests || [];
+              const restrictions = participant.restrictions || [];
+              
+              let participantInfo = `**${name}${age}:**\n`;
+              
+              if (wishes.length > 0) {
+                participantInfo += `- 行きたい場所: ${wishes.join(', ')}\n`;
+              }
+              
+              if (interests.length > 0) {
+                participantInfo += `- 興味・関心: ${interests.join(', ')}\n`;
+              }
+              
+              if (restrictions.length > 0) {
+                participantInfo += `- 制約・配慮事項: ${restrictions.join(', ')}\n`;
+              }
+              
+              if (participant.budget) {
+                participantInfo += `- 個人予算: ${participant.budget}\n`;
+              }
+              
+              return participantInfo;
+            }).join('\n');
+          }
+
+          sendProgress(20, '目的地の情報を収集中...');
+          await new Promise(resolve => setTimeout(resolve, 1500));
+
+          // カスタムプロンプトが提供された場合は使用
+          const promptToUse = customPrompt || defaultPromptTemplate;
+          
+          // 参加者の要望をフォーマット
+          const participantsPreferences = formatParticipantsPreferences(participants);
+          
+          // プロンプトにパラメータを埋め込む
+          let filledPrompt = promptToUse
+            .replace('{{destination}}', destination || '')
+            .replace('{{date}}', date || '')
+            .replace('{{season}}', season || '')
+            .replace('{{seasonal_considerations}}', seasonal_considerations || '')
+            .replace('{{budget}}', budget || '')
+            .replace('{{number_of_people}}', number_of_people || '')
+            .replace('{{interests}}', interests || '')
+            .replace('{{additional_requests}}', additional_requests || '')
+            .replace('{{participants_preferences}}', participantsPreferences);
+
+          sendProgress(40, '最適なルートを計算中...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+          sendProgress(60, 'アクティビティを選定中...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+          // OpenAI API呼び出し
+          const response = await client.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              { 
+                role: "system", 
+                content: "あなたは旅行プランの専門家です。指定されたJSON形式で3つのプランを正確に出力してください。" 
+              },
+              { role: "user", content: filledPrompt }
+            ],
+            response_format: { type: "json_object" },
+          });
+
+          sendProgress(80, 'プランの最終調整中...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // レスポンスの検証
+          const messageContent = response.choices[0]?.message?.content;
+
+          if (!messageContent) {
+            throw new Error('No content received from OpenAI API');
+          }
+
+          // JSONレスポンスをパース
+          let parsedJSON;
+          try {
+            parsedJSON = JSON.parse(messageContent);
+          } catch (error) {
+            console.error('JSON parsing error:', error);
+            throw new Error('Failed to parse JSON from API response');
+          }
+
+          let travelPlans = parsedJSON;
+          
+          // プラン形式の基本構造検証
+          if (!travelPlans.plans || !Array.isArray(travelPlans.plans)) {
+            throw new Error('Invalid travel plans structure - missing plans array');
+          }
+
+          sendProgress(100, '完了しました！');
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // 完了データを送信
+          const completeData = JSON.stringify({
+            type: 'complete',
+            plans: travelPlans.plans
+          });
+          controller.enqueue(encoder.encode(`data: ${completeData}\n\n`));
+
+        } catch (error) {
+          console.error('Error generating travel plan:', error);
+          
+          const errorData = JSON.stringify({
+            type: 'error',
+            message: error.message
+          });
+          controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
+        } finally {
+          controller.close();
+        }
       }
-      
-      return participants.map((participant, index) => {
-        const name = participant.name || `参加者${index + 1}`;
-        const age = participant.age ? `（${participant.age}歳）` : '';
-        const wishes = participant.wishes || [];
-        const interests = participant.interests || [];
-        const restrictions = participant.restrictions || [];
-        
-        let participantInfo = `**${name}${age}:**\n`;
-        
-        if (wishes.length > 0) {
-          participantInfo += `- 行きたい場所: ${wishes.join(', ')}\n`;
-        }
-        
-        if (interests.length > 0) {
-          participantInfo += `- 興味・関心: ${interests.join(', ')}\n`;
-        }
-        
-        if (restrictions.length > 0) {
-          participantInfo += `- 制約・配慮事項: ${restrictions.join(', ')}\n`;
-        }
-        
-        if (participant.budget) {
-          participantInfo += `- 個人予算: ${participant.budget}\n`;
-        }
-        
-        return participantInfo;
-      }).join('\n');
-    }
-    
-    // カスタムプロンプトが提供された場合は使用
-    const promptToUse = customPrompt || currentPromptTemplate;
-    
-    // 参加者の要望をフォーマット
-    const participantsPreferences = formatParticipantsPreferences(participants);
-    
-    // プロンプトにパラメータを埋め込む
-    let filledPrompt = promptToUse
-      .replace('{{destination}}', destination || '')
-      .replace('{{date}}', date || '')
-      .replace('{{season}}', season || '')
-      .replace('{{seasonal_considerations}}', seasonal_considerations || '')
-      .replace('{{budget}}', budget || '')
-      .replace('{{number_of_people}}', number_of_people || '')
-      .replace('{{interests}}', interests || '')
-      .replace('{{additional_requests}}', additional_requests || '')
-      .replace('{{participants_preferences}}', participantsPreferences);
-    
-    // OpenAI Chat Completions APIを呼び出し(検索機能持ちプランニングモデル)
-    const response1 = await client.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { 
-          role: "system", 
-          content: "あなたは旅行プランの専門家です。指定されたJSON形式で3つのプランを正確に出力してください。" 
-        },
-        { role: "user", content: filledPrompt }
-      ],
-      response_format: { type: "json_object" },
-      // max_tokens: 4000,
     });
-    
-    // レスポンスの検証
-    const messageContent1 = response1.choices[0]?.message?.content;
-    console.log('=== 生のレスポンス ===');
-    console.log(messageContent1);
 
-    if (!messageContent1) {
-      throw new Error('No content received from OpenAI API');
-    }
-
-    // JSONレスポンスをパース
-    let parsedJSON;
-    try {
-      parsedJSON = JSON.parse(messageContent1);
-    } catch (error) {
-      console.error('JSON parsing error:', error);
-      throw new Error('Failed to parse JSON from API response');
-    }
-
-    let travelPlans = parsedJSON;
-    
-    // プラン形式の基本構造検証
-    if (!travelPlans.plans || !Array.isArray(travelPlans.plans)) {
-      throw new Error('Invalid travel plans structure - missing plans array');
-    }
-    
-    if (travelPlans.plans.length !== 3) {
-      throw new Error(`Expected 3 travel plans, but got ${travelPlans.plans.length}`);
-    }
-    
-    // 各プランの構造検証
-    travelPlans.plans.forEach((plan, index) => {
-      if (!plan.trip_id || !plan.theme || !plan.hero || !plan.itinerary || !Array.isArray(plan.itinerary)) {
-        throw new Error(`Invalid structure in plan ${index + 1}`);
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
       }
     });
-    
-    return NextResponse.json(travelPlans);
-    
+
   } catch (error) {
-    console.error('Error generating travel plan:', error);
-    
-    // エラーの種類に応じたレスポンス
-    if (error.status === 401) {
-      return NextResponse.json(
-        { error: 'Invalid API key' },
-        { status: 401 }
-      );
-    } else if (error.status === 429) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded' },
-        { status: 429 }
-      );
-    } else {
-      return NextResponse.json(
-        { error: 'Travel plan generation failed', message: error.message },
-        { status: 500 }
-      );
-    }
+    console.error('Error in streaming endpoint:', error);
+    return new Response(JSON.stringify({
+      type: 'error',
+      message: error.message
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }

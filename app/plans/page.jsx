@@ -57,9 +57,16 @@ export default function PlansPage() {
           if (storedPlans) {
             const parsedPlans = JSON.parse(storedPlans);
             
+            // 新しい形式（日付情報を含む）の場合
             if (parsedPlans.plans && Array.isArray(parsedPlans.plans)) {
               setPlans(parsedPlans.plans);
+              // 日付情報が含まれている場合は状態にセット
+              if (parsedPlans.travelDates) {
+                setStartDate(parsedPlans.travelDates.startDate || '');
+                setEndDate(parsedPlans.travelDates.endDate || '');
+              }
             } else if (Array.isArray(parsedPlans)) {
+              // 古い形式（プランのみの配列）の場合
               setPlans(parsedPlans);
             } else {
               // 単一プランの場合は配列に変換
@@ -498,11 +505,22 @@ export default function PlansPage() {
       const planWithDates = {
         ...selectedPlanData,
         travel_dates: {
-          start: startDate,
-          end: endDate
+          startDate: startDate,
+          endDate: endDate,
+          duration: (() => {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            return `${days}日間`;
+          })()
         }
       };
       localStorage.setItem('selectedPlanWithDates', JSON.stringify(planWithDates));
+      console.log('プラン確定（日程あり）:', planWithDates);
+    } else {
+      // 日程が未設定の場合は元のプランデータのみ
+      localStorage.setItem('selectedPlanWithDates', JSON.stringify(selectedPlanData));
+      console.log('プラン確定（日程なし）:', selectedPlanData);
     }
     router.push('/confirm');
   };
@@ -996,7 +1014,34 @@ export default function PlansPage() {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-600">期間</span>
-                      <span className="font-medium">{selectedPlanData.hero.duration}</span>
+                      {startDate && endDate ? (
+                        <div className="text-right">
+                          <div className="font-medium text-blue-600">
+                            {new Date(startDate).toLocaleDateString('ja-JP', {
+                              month: 'short',
+                              day: 'numeric'
+                            })} 〜 {new Date(endDate).toLocaleDateString('ja-JP', {
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {(() => {
+                              const start = new Date(startDate);
+                              const end = new Date(endDate);
+                              const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                              return `${days}日間の旅程`;
+                            })()}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-right">
+                          <span className="font-medium">{selectedPlanData.hero.duration}</span>
+                          <div className="text-xs text-gray-500">
+                            日程未設定
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">予算目安</span>
@@ -1009,15 +1054,6 @@ export default function PlansPage() {
                       </div>
                     )}
                   </div>
-                  
-                  {/* 日程設定ボタン */}
-                  <button
-                    onClick={() => setShowDatePicker(!showDatePicker)}
-                    className="w-full mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg font-medium transition-colors flex items-center justify-center"
-                  >
-                    <span className="mr-2">📅</span>
-                    {startDate && endDate ? '日程を変更' : '具体的な日程を設定'}
-                  </button>
 
                   {/* 日程選択フォーム */}
                   {showDatePicker && (

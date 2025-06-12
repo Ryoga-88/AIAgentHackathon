@@ -64,7 +64,24 @@ export default function ConfirmPage() {
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <div className="text-2xl mb-2">📅</div>
               <div className="font-semibold text-gray-900">期間</div>
-              <div className="text-gray-600">{plan.hero.duration}</div>
+              {planWithDates?.travel_dates ? (
+                <div className="text-gray-600">
+                  <div className="text-sm">
+                    {new Date(planWithDates.travel_dates.start).toLocaleDateString('ja-JP', {
+                      month: 'short',
+                      day: 'numeric'
+                    })} - {new Date(planWithDates.travel_dates.end).toLocaleDateString('ja-JP', {
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {Math.ceil((new Date(planWithDates.travel_dates.end) - new Date(planWithDates.travel_dates.start)) / (1000 * 60 * 60 * 24))}日間
+                  </div>
+                </div>
+              ) : (
+                <div className="text-gray-600">{plan.hero.duration}</div>
+              )}
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">
               <div className="text-2xl mb-2">💰</div>
@@ -74,17 +91,17 @@ export default function ConfirmPage() {
           </div>
 
           {/* 具体的な日程表示 */}
-          {planWithDates?.travel_dates && (
+          {planWithDates?.travel_dates && (planWithDates.travel_dates.startDate || planWithDates.travel_dates.start) && (
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-8 border border-blue-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                 <span className="mr-2">🗓️</span>
                 確定した旅行日程
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="text-center p-3 bg-white rounded-lg">
                   <div className="text-sm text-gray-600 mb-1">出発日</div>
                   <div className="text-lg font-semibold text-blue-700">
-                    {new Date(planWithDates.travel_dates.start).toLocaleDateString('ja-JP', {
+                    {new Date(planWithDates.travel_dates.startDate || planWithDates.travel_dates.start).toLocaleDateString('ja-JP', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
@@ -95,12 +112,23 @@ export default function ConfirmPage() {
                 <div className="text-center p-3 bg-white rounded-lg">
                   <div className="text-sm text-gray-600 mb-1">帰着日</div>
                   <div className="text-lg font-semibold text-blue-700">
-                    {new Date(planWithDates.travel_dates.end).toLocaleDateString('ja-JP', {
+                    {new Date(planWithDates.travel_dates.endDate || planWithDates.travel_dates.end).toLocaleDateString('ja-JP', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
                       weekday: 'short'
                     })}
+                  </div>
+                </div>
+                <div className="text-center p-3 bg-white rounded-lg lg:col-span-1 sm:col-span-2">
+                  <div className="text-sm text-gray-600 mb-1">旅行期間</div>
+                  <div className="text-lg font-semibold text-green-700">
+                    {planWithDates.travel_dates.duration || (() => {
+                      const start = new Date(planWithDates.travel_dates.startDate || planWithDates.travel_dates.start);
+                      const end = new Date(planWithDates.travel_dates.endDate || planWithDates.travel_dates.end);
+                      const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                      return `${days}日間`;
+                    })()}
                   </div>
                 </div>
               </div>
