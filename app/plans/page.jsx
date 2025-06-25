@@ -134,86 +134,93 @@ export default function PlansPage() {
           setLocationData({});
         }
 
-        // 各プランの日毎にホテルを検索（改善版）
-        const hotelPromises = [];
+        // 各プランの旅行プラン全体を使用して高評価ホテルを検索（改善版）
         const hotelResults = {};
         
         for (const plan of plans.filter(plan => plan && plan.itinerary && Array.isArray(plan.itinerary))) {
-          hotelResults[plan.trip_id] = {};
-          
-          for (const day of plan.itinerary) {
-            // 最終日以外の日でホテル検索
-            if (day.accommodation && day.accommodation !== "出発日のため宿泊なし") {
-              const accommodationLocation = day.accommodation;
-              const dayNumber = day.day;
-              
-              // チェックイン日とチェックアウト日を設定
-              const today = new Date();
-              const checkinDate = new Date(today.getTime() + (7 + dayNumber - 1) * 24 * 60 * 60 * 1000);
-              const checkoutDate = new Date(checkinDate.getTime() + 24 * 60 * 60 * 1000);
-              
-              const checkinStr = checkinDate.toISOString().split('T')[0];
-              const checkoutStr = checkoutDate.toISOString().split('T')[0];
-              
-              const promise = (async () => {
-                try {
-                  console.log(`Day ${dayNumber} ホテル検索: ${accommodationLocation}`, {
-                    checkin: checkinStr,
-                    checkout: checkoutStr
-                  });
-                  
-                  const hotelResponse = await fetch('/api/search-hotels', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      checkin: checkinStr,
-                      checkout: checkoutStr,
-                      adults: 2,
-                      searchType: 'location',
-                      location: accommodationLocation
-                    }),
-                  });
+          try {
+            // 旅行開始日を設定（今日から一週間後）
+            const today = new Date();
+            const startDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+            const endDate = new Date(startDate.getTime() + (plan.itinerary.length - 1) * 24 * 60 * 60 * 1000);
+            
+            const checkinStr = startDate.toISOString().split('T')[0];
+            const checkoutStr = endDate.toISOString().split('T')[0];
+            
+            console.log(`プラン ${plan.trip_id} 高評価ホテル検索開始:`, {
+              checkin: checkinStr,
+              checkout: checkoutStr,
+              locations: plan.itinerary.length
+            });
+            
+            const hotelResponse = await fetch('/api/search-hotels', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                checkin: checkinStr,
+                checkout: checkoutStr,
+                adults: 2,
+                searchType: 'itinerary',
+                itinerary: plan.itinerary
+              }),
+            });
 
-                  if (hotelResponse.ok) {
-                    const hotelData = await hotelResponse.json();
-                    console.log(`Day ${dayNumber} ホテル検索成功:`, hotelData);
-                    return { 
-                      trip_id: plan.trip_id, 
-                      day: dayNumber,
-                      results: hotelData.results || []
-                    };
-                  } else {
-                    console.error(`Day ${dayNumber} ホテル検索失敗:`, hotelResponse.status);
-                  }
-                } catch (error) {
-                  console.error(`Day ${dayNumber} ホテル検索エラー:`, error);
-                }
-                return { trip_id: plan.trip_id, day: dayNumber, results: [] };
-              })();
+            if (hotelResponse.ok) {
+              const hotelData = await hotelResponse.json();
+              console.log(`プラン ${plan.trip_id} 高評価ホテル検索成功:`, hotelData);
               
-              hotelPromises.push(promise);
+              // 高評価ホテルをプランに関連付け
+              hotelResults[plan.trip_id] = {
+                hotels: hotelData.results || [],
+                searchInfo: hotelData.searchInfo || {},
+                message: hotelData.message || ''
+              };
+              
+              // 各日に関連するホテルを配分（近隣性に基づく）
+              const dayBasedHotels = {};
+              hotelData.results?.forEach((hotel) => {
+                const nearbyDay = hotel.searchDay || 1;
+                if (!dayBasedHotels[`day_${nearbyDay}`]) {
+                  dayBasedHotels[`day_${nearbyDay}`] = [];
+                }
+                dayBasedHotels[`day_${nearbyDay}`].push(hotel);
+              });
+              
+              // 各日に少なくとも3つのホテルが表示されるよう調整
+              plan.itinerary.forEach((day) => {
+                if (day.accommodation && day.accommodation !== "出発日のため宿泊なし") {
+                  if (!dayBasedHotels[`day_${day.day}`] || dayBasedHotels[`day_${day.day}`].length < 3) {
+                    // 全体のホテルリストから追加
+                    const additionalHotels = (hotelData.results || [])
+                      .filter(hotel => !dayBasedHotels[`day_${day.day}`]?.some(existingHotel => existingHotel.id === hotel.id))
+                      .slice(0, 3 - (dayBasedHotels[`day_${day.day}`]?.length || 0));
+                    
+                    if (!dayBasedHotels[`day_${day.day}`]) {
+                      dayBasedHotels[`day_${day.day}`] = [];
+                    }
+                    dayBasedHotels[`day_${day.day}`].push(...additionalHotels);
+                  }
+                }
+              });
+              
+              // 日毎のホテル情報をマージ
+              hotelResults[plan.trip_id] = {
+                ...hotelResults[plan.trip_id],
+                ...dayBasedHotels
+              };
+              
+            } else {
+              console.error(`プラン ${plan.trip_id} ホテル検索失敗:`, hotelResponse.status);
             }
+          } catch (error) {
+            console.error(`プラン ${plan.trip_id} ホテル検索エラー:`, error);
           }
         }
 
-        // ホテル情報を設定（日毎）
-        try {
-          const hotelResponses = await Promise.all(hotelPromises);
-          hotelResponses.forEach(response => {
-            if (!hotelResults[response.trip_id]) {
-              hotelResults[response.trip_id] = {};
-            }
-            hotelResults[response.trip_id][`day_${response.day}`] = response.results;
-          });
-          console.log('日毎ホテル検索結果:', hotelResults);
-          setHotels(hotelResults);
-        } catch (error) {
-          console.error('ホテル情報取得に失敗:', error);
-          // エラーが発生してもアプリケーションを継続
-          setHotels({});
-        }
+        console.log('高評価ホテル検索結果:', hotelResults);
+        setHotels(hotelResults);
 
         // プランのヒーロー画像を並行取得
         const heroImagePromises = [];
@@ -780,9 +787,7 @@ export default function PlansPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          origin: from.searchQuery,
-          destination: to.searchQuery,
-          mode: 'driving'
+          waypoints: [from.searchQuery, to.searchQuery]
         }),
       });
 
@@ -1610,10 +1615,25 @@ export default function PlansPage() {
 
                 {/* Recommended Hotels */}
                 <div className="mt-8">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-4">おすすめホテル</h3>
-                  {hotels[selectedPlanData.trip_id] && Object.keys(hotels[selectedPlanData.trip_id]).length > 0 ? (
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">おすすめ高評価ホテル</h3>
+                  {/* 検索情報の表示 */}
+                  {hotels[selectedPlanData.trip_id]?.searchInfo && (
+                    <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="flex items-center text-sm text-blue-800">
+                        <span className="mr-2">ℹ️</span>
+                        <span>
+                          {hotels[selectedPlanData.trip_id].searchInfo.totalLocationsSearched}ヶ所の観光地から
+                          高評価ホテル{hotels[selectedPlanData.trip_id].searchInfo.highRatedHotelsReturned}件を厳選
+                          （評価{hotels[selectedPlanData.trip_id].searchInfo.minRating}以上）
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {hotels[selectedPlanData.trip_id] && Object.keys(hotels[selectedPlanData.trip_id]).filter(key => key.startsWith('day_')).length > 0 ? (
                     <div className="space-y-6">
-                      {Object.entries(hotels[selectedPlanData.trip_id]).map(([dayKey, dayHotels]) => {
+                      {Object.entries(hotels[selectedPlanData.trip_id])
+                        .filter(([dayKey]) => dayKey.startsWith('day_'))
+                        .map(([dayKey, dayHotels]) => {
                         const dayNumber = dayKey.replace('day_', '');
                         const dayData = selectedPlanData.itinerary.find(d => d.day === parseInt(dayNumber));
                         
@@ -1637,6 +1657,11 @@ export default function PlansPage() {
                                     <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
                                       Day {dayNumber}
                                     </div>
+                                    {hotel.rating >= 4.0 && (
+                                      <div className="absolute top-2 left-2 bg-yellow-500 text-white px-2 py-1 rounded text-xs font-bold">
+                                        高評価
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="p-4">
                                     <h5 className="font-bold text-gray-900 mb-2 text-sm leading-tight">{hotel.name}</h5>
@@ -1644,6 +1669,12 @@ export default function PlansPage() {
                                       <span className="mr-1">📍</span>
                                       {hotel.location}
                                     </p>
+                                    {hotel.nearbyLocation && (
+                                      <p className="text-xs text-blue-600 mb-2 flex items-center">
+                                        <span className="mr-1">🎯</span>
+                                        {hotel.nearbyLocation}の近く
+                                      </p>
+                                    )}
                                     <div className="flex items-center justify-between mb-2">
                                       <div className="flex items-center space-x-1">
                                         <div className="flex text-yellow-400 text-xs">

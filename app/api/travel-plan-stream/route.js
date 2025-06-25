@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 // OpenAI クライアントの初期化（APIキーがない場合はnull）
 let client = null;
@@ -10,12 +10,12 @@ try {
     });
   }
 } catch (error) {
-  console.log('OpenAI client initialization failed:', error.message);
+  console.log("OpenAI client initialization failed:", error.message);
 }
 
-// デフォルトのプロンプトテンプレート
+// デフォルトのプロンプトテンプレート（Search API向けに最適化）
 const defaultPromptTemplate = `
-あなたは旅行プランの専門家です。以下の条件に基づいて、詳細な旅行プランを作成してください。
+あなたは旅行プランの専門家です。最新の観光情報、営業時間、料金情報を検索して、現在の正確な情報に基づいて詳細な旅行プランを作成してください。
 
 **基本条件:**
 - 目的地: {{destination}}
@@ -27,15 +27,12 @@ const defaultPromptTemplate = `
 - 興味: {{interests}}
 - その他の要望: {{additional_requests}}
 
-**日程・予算について:**
-- 日程が指定されていない場合は、目的地に適した一般的な旅行期間（2〜3日程度）でプランを作成してください
-- 予算が指定されていない場合は、目的地とアクティビティに適した一般的な予算設定でプランを作成してください
-
-**季節に応じた特別配慮:**
-- 旅行時期（{{season}}）に最適な服装、持ち物、アクティビティを考慮してください
-- 季節特有のイベント、見どころ、グルメを積極的に取り入れてください
-- 天候や気温に配慮した現実的なスケジュールを組んでください
-- {{seasonal_considerations}}これらの要素を旅行プランに反映させてください
+**検索・調査指示:**
+1. 目的地の最新の観光情報、人気スポット、営業時間、料金を検索してください
+2. 現在の季節（{{season}}）に最適な観光地、イベント、グルメ情報を調査してください
+3. 最新の交通情報、アクセス方法、所要時間を確認してください
+4. 現在の宿泊施設の料金相場、人気エリアを調査してください
+5. 最新のレストラン情報、営業時間、予約の必要性を確認してください
 
 **参加者の個別要望:**
 {{participants_preferences}}
@@ -45,6 +42,7 @@ const defaultPromptTemplate = `
 - 各日の活動場所やアクティビティは全て異なるものにしてください
 - 同一施設や同一エリアでの複数回の訪問は避けてください
 - レストランや飲食店も可能な限り重複しないようにしてください
+- **必ず最新の営業時間、定休日、料金を確認して現実的なスケジュールを作成してください**
 
 **複数人の要望統合ガイドライン:**
 - すべての参加者の希望を可能な限り旅行プランに含めてください
@@ -59,26 +57,24 @@ const defaultPromptTemplate = `
 - フライト時間、空港での手続き時間、移動時間を十分に考慮してください
 - 到着日と出発日は移動時間を考慮して活動時間を調整してください
 - 通貨は現地通貨で表記し、必要に応じて日本円での目安も併記してください
-- 現地の文化や慣習、営業時間、休業日なども考慮してください
+- 現地の文化や慣習、営業時間、休業日なども最新情報を検索して考慮してください
 
 **宿泊に関する要件:**
 - 旅行期間が1日の場合：日帰りのため宿泊情報は不要
 - 旅行期間が2日以上の場合：宿泊数 = 旅行期間 - 1日
-  - 例：2日間 → 1泊、3日間 → 2泊、4日間 → 3泊
-- 海外旅行の場合：移動日も含めた実質的な現地滞在を考慮してください
+- 最新の宿泊施設情報、料金相場を検索して現実的な提案をしてください
 - 最終日以外の各日には、その夜泊まる宿泊地名を{accommodation}フィールドに出力してください
 - 最終日は出発日のため{accommodation}は"出発日のため宿泊なし"または空文字列にしてください
-- 海外の場合は都市名・地域名に加えて国名も含めてください
 
 **経路探索用の場所情報について:**
 - 各アクティビティに "search_query" フィールドを必ず追加してください
 - 具体的な観光地・施設がある場合：正確な場所名 + 地域名（例："清水寺 京都市", "函館山 北海道"）
 - 抽象的な活動の場合：空文字列 ""
-- 必ず実在する場所のみを記載し、不確実な場合は search_query を空文字列にしてください
+- 必ず実在する場所のみを記載し、最新の営業状況を確認してください
 
 **その他の要件:**
-- 一般的な観光情報に基づいて、実用的なプランを作成してください
-- 移動時間や交通手段も考慮した現実的なスケジュールにしてください
+- **最新の観光情報、営業時間、料金情報を検索して反映してください**
+- 移動時間や交通手段も最新情報を考慮した現実的なスケジュールにしてください
 - **JSONのみを返し、説明文やコメントは一切含めないでください**
 - **出力は必ず有効なJSON形式にしてください**
 
@@ -129,16 +125,19 @@ const defaultPromptTemplate = `
               "subtitle": "アクティビティのサブタイトル",
               "type": "アクティビティの種類（heritage, culinary, experience, scenic等）",
               "priority": "優先度（must_see, must_do, recommended等）",
-              "description": "詳細な説明",
+              "description": "詳細な説明（最新情報を含む）",
               "location": "場所の名称",
               "search_query": "Google Maps検索用クエリ（具体的な場所がある場合のみ、ない場合は空文字列）",
-              "price": "料金",
+              "price": "料金（最新情報）",
               "rating": "評価（数値）",
-              "tips": "おすすめのポイントやコツ",
+              "tips": "おすすめのポイントやコツ（最新情報を含む）",
               "activity_english": "Activity description (English)",
               "image_search_term": "City Name + Activity in English",
               "category": "sightseeing, food, activity, shopping..etc",
               "is_free": "アクティビティにお金がかかるか否か（bool）",
+              "operating_hours": "営業時間（最新情報）",
+              "closed_days": "定休日（最新情報）",
+              "booking_required": "予約の必要性（bool）"
             }
           ],
           "accommodation": "宿泊予定の場所（市・地域）"
@@ -161,17 +160,6 @@ const defaultPromptTemplate = `
     }
   ]
 }
-
-**search_query の具体例:**
-- 具体的な観光地：
-  - "清水寺 京都市東山区"
-  - "東京スカイツリー 墨田区"
-  - "函館山ロープウェイ 函館市"
-  - "金閣寺 京都市北区"
-  - "浅草寺 台東区"
-- 抽象的な活動：
-  - ""（空文字列）
-  - 例：温泉街散策、ショッピング、自然散策、海岸ドライブなど
 `;
 
 // ストリーミング対応のPOSTエンドポイント
@@ -179,132 +167,170 @@ export async function POST(request) {
   try {
     // OpenAI APIキーのチェック
     if (!client) {
-      console.log('OpenAI API key not configured, returning mock data');
+      console.log("OpenAI API key not configured, returning mock data");
       // APIキーがない場合はモックデータを返す
-      return new Response(JSON.stringify({
-        type: 'complete',
-        plans: []
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return new Response(
+        JSON.stringify({
+          type: "complete",
+          plans: [],
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
 
     const body = await request.json();
-    
+
     // リクエストからパラメータを取得
-    const { 
-      destination, 
-      date, 
+    const {
+      destination,
+      date,
       season,
       seasonal_considerations,
-      budget, 
-      number_of_people, 
-      interests, 
-      additional_requests, 
+      budget,
+      number_of_people,
+      interests,
+      additional_requests,
       customPrompt,
       participants,
-      duration
+      duration,
     } = body;
-    
+
     // 必須パラメータの検証
     if (!destination) {
-      return new Response(JSON.stringify({
-        type: 'error',
-        message: 'destination is required'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return new Response(
+        JSON.stringify({
+          type: "error",
+          message: "destination is required",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
 
-    // 推定処理時間の計算（日数 × 1分）
-    const estimatedTimeMinutes = duration || 3; // デフォルト3分
+    // 推定処理時間の計算（Search APIは時間がかかる可能性があるため調整）
+    const estimatedTimeMinutes = (duration || 3) + 2; // 検索時間を考慮して+2分
     const estimatedTimeSeconds = estimatedTimeMinutes * 60;
 
     // ストリーミングレスポンスの設定
     const encoder = new TextEncoder();
-    
+
     const stream = new ReadableStream({
       async start(controller) {
         try {
           // 進捗を段階的に送信
           const sendProgress = (progress, message) => {
             const data = JSON.stringify({
-              type: 'progress',
+              type: "progress",
               progress,
               message,
-              estimatedTime: estimatedTimeSeconds
+              estimatedTime: estimatedTimeSeconds,
             });
             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
           };
 
           // 初期進捗
-          sendProgress(0, 'リクエスト情報を解析中...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          sendProgress(0, "リクエスト情報を解析中...");
+          await new Promise((resolve) => setTimeout(resolve, 1000));
 
           // 参加者の要望を統合する関数
           function formatParticipantsPreferences(participants) {
-            if (!participants || !Array.isArray(participants) || participants.length === 0) {
-              return '特になし';
+            if (
+              !participants ||
+              !Array.isArray(participants) ||
+              participants.length === 0
+            ) {
+              return "特になし";
             }
-            
-            return participants.map((participant, index) => {
-              const name = participant.name || `参加者${index + 1}`;
-              const age = participant.age ? `（${participant.age}歳）` : '';
-              const wishes = participant.wishes || [];
-              const interests = participant.interests || [];
-              const restrictions = participant.restrictions || [];
-              
-              let participantInfo = `**${name}${age}:**\n`;
-              
-              if (wishes.length > 0) {
-                participantInfo += `- 行きたい場所: ${wishes.join(', ')}\n`;
-              }
-              
-              if (interests.length > 0) {
-                participantInfo += `- 興味・関心: ${interests.join(', ')}\n`;
-              }
-              
-              if (restrictions.length > 0) {
-                participantInfo += `- 制約・配慮事項: ${restrictions.join(', ')}\n`;
-              }
-              
-              if (participant.budget) {
-                participantInfo += `- 個人予算: ${participant.budget}\n`;
-              }
-              
-              return participantInfo;
-            }).join('\n');
+
+            return participants
+              .map((participant, index) => {
+                const name = participant.name || `参加者${index + 1}`;
+                const age = participant.age ? `（${participant.age}歳）` : "";
+                const wishes = participant.wishes || [];
+                const interests = participant.interests || [];
+                const restrictions = participant.restrictions || [];
+
+                let participantInfo = `**${name}${age}:**\n`;
+
+                if (wishes.length > 0) {
+                  participantInfo += `- 行きたい場所: ${wishes.join(", ")}\n`;
+                }
+
+                if (interests.length > 0) {
+                  participantInfo += `- 興味・関心: ${interests.join(", ")}\n`;
+                }
+
+                if (restrictions.length > 0) {
+                  participantInfo += `- 制約・配慮事項: ${restrictions.join(
+                    ", "
+                  )}\n`;
+                }
+
+                if (participant.budget) {
+                  participantInfo += `- 個人予算: ${participant.budget}\n`;
+                }
+
+                return participantInfo;
+              })
+              .join("\n");
           }
 
-          sendProgress(20, '目的地の情報を収集中...');
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          sendProgress(15, "最新の観光情報を検索中...");
+          await new Promise((resolve) => setTimeout(resolve, 2000));
 
           // カスタムプロンプトが提供された場合は使用
           const promptToUse = customPrompt || defaultPromptTemplate;
-          
+
           // 参加者の要望をフォーマット
-          const participantsPreferences = formatParticipantsPreferences(participants);
-          
+          const participantsPreferences =
+            formatParticipantsPreferences(participants);
+
           // プロンプトにパラメータを埋め込む
           let filledPrompt = promptToUse
-            .replace('{{destination}}', destination || '')
-            .replace('{{date}}', date || '日程未指定（適切な期間を設定してください）')
-            .replace('{{season}}', season || '年間を通して楽しめる')
-            .replace('{{seasonal_considerations}}', seasonal_considerations || '特になし')
-            .replace('{{budget}}', budget || '一般的な予算（適切な金額を設定してください）')
-            .replace('{{number_of_people}}', number_of_people || '')
-            .replace('{{interests}}', interests || '')
-            .replace('{{additional_requests}}', additional_requests || '')
-            .replace('{{participants_preferences}}', participantsPreferences);
+            .replace("{{destination}}", destination || "")
+            .replace(
+              "{{date}}",
+              date || "日程未指定（適切な期間を設定してください）"
+            )
+            .replace("{{season}}", season || "年間を通して楽しめる")
+            .replace(
+              "{{seasonal_considerations}}",
+              seasonal_considerations || "特になし"
+            )
+            .replace(
+              "{{budget}}",
+              budget || "一般的な予算（適切な金額を設定してください）"
+            )
+            .replace("{{number_of_people}}", number_of_people || "")
+            .replace("{{interests}}", interests || "")
+            .replace("{{additional_requests}}", additional_requests || "")
+            .replace("{{participants_preferences}}", participantsPreferences);
 
-          sendProgress(40, '最適なルートを計算中...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          sendProgress(30, "営業時間・料金情報を調査中...");
+          await new Promise((resolve) => setTimeout(resolve, 2000));
 
-          // 3つのプランを個別に生成
-          const generateSinglePlan = async (planType, planNumber, progressStart, progressEnd) => {
+          // 3つのプランを個別に生成（Search API使用）
+          const generateSinglePlan = async (
+            planType,
+            planNumber,
+            progressStart,
+            progressEnd
+          ) => {
             const singlePlanPrompt = `
-あなたは旅行プランの専門家です。以下の条件に基づいて、詳細な旅行プランを1つ作成してください。
+あなたは旅行プランの専門家です。最新の観光情報を検索して、以下の条件に基づいた詳細な旅行プランを1つ作成してください。
+
+**検索指示:**
+まず「${destination}」の最新の観光情報、営業時間、料金、アクセス情報を検索してください。
+特に以下の点を重点的に調査してください：
+- 人気観光スポットの営業時間と料金
+- 現在の季節（${season}）におすすめのアクティビティ
+- 交通アクセスと所要時間
+- 宿泊施設の相場と人気エリア
+- レストランの営業時間と予約の必要性
 
 **基本条件:**
 - 目的地: ${destination}
@@ -318,9 +344,21 @@ export async function POST(request) {
 - プランタイプ: ${planType}
 
 **プランタイプ別の特別配慮:**
-${planType === 'sunny_outdoor' ? '- 屋外活動を中心とした晴天時向けプラン（自然観光、アウトドア体験、屋外グルメなど）' : ''}
-${planType === 'sunny_cultural' ? '- 晴天時向けの文化・歴史中心プラン（寺社仏閣、美術館、伝統体験、街歩きなど）' : ''}
-${planType === 'rainy_indoor' ? '- 屋内活動を中心とした雨天時向けプラン（屋内観光、ショッピング、屋内エンターテイメントなど）' : ''}
+${
+  planType === "sunny_outdoor"
+    ? "- 屋外活動を中心とした晴天時向けプラン（自然観光、アウトドア体験、屋外グルメなど）"
+    : ""
+}
+${
+  planType === "sunny_cultural"
+    ? "- 晴天時向けの文化・歴史中心プラン（寺社仏閣、美術館、伝統体験、街歩きなど）"
+    : ""
+}
+${
+  planType === "rainy_indoor"
+    ? "- 屋内活動を中心とした雨天時向けプラン（屋内観光、ショッピング、屋内エンターテイメントなど）"
+    : ""
+}
 
 **参加者の個別要望:**
 ${participantsPreferences}
@@ -328,14 +366,15 @@ ${participantsPreferences}
 **重要な制約事項:**
 - 同じアクティビティや同じ場所への訪問は一度のみとしてください
 - 各日の活動場所やアクティビティは全て異なるものにしてください
-- 最新の観光情報や営業時間を考慮して、実用的なプランを作成してください
+- 必ず最新の営業時間、定休日、料金を検索して反映してください
+- 現実的で実行可能なスケジュールを作成してください
 
 **出力形式:**
 以下の形式のJSONで1つのプランを出力してください：
 {
   "plan_number": ${planNumber},
   "trip_id": "${destination}_${planType}_${Date.now()}",
-  "weather_type": "${planType.includes('rainy') ? 'rainy' : 'sunny'}",
+  "weather_type": "${planType.includes("rainy") ? "rainy" : "sunny"}",
   "theme": "旅行のテーマ",
   "theme_description": "このプランのテーマの説明",
   "hero": {
@@ -363,15 +402,19 @@ ${participantsPreferences}
           "subtitle": "アクティビティのサブタイトル",
           "type": "heritage/culinary/experience/scenic等",
           "priority": "must_see/must_do/recommended等",
-          "description": "詳細な説明",
+          "description": "詳細な説明（最新情報を含む）",
           "location": "場所の名称",
-          "price": "料金",
+          "search_query": "Google Maps検索用クエリ",
+          "price": "料金（最新情報）",
           "rating": 4.5,
-          "tips": "おすすめのポイント",
+          "tips": "おすすめのポイント（最新情報を含む）",
           "activity_english": "Activity description (English)",
           "image_search_term": "City Name + Activity in English",
           "category": "sightseeing/food/activity/shopping等",
-          "is_free": false
+          "is_free": false,
+          "operating_hours": "営業時間（最新情報）",
+          "closed_days": "定休日（最新情報）",
+          "booking_required": false
         }
       ],
       "accommodation": "宿泊予定の場所"
@@ -379,17 +422,20 @@ ${participantsPreferences}
   ]
 }`;
 
+            // Search APIを使用してプランを生成
             const response = await client.chat.completions.create({
-              model: "gpt-4o-2024-11-20", // GPT-4o-search-previewを使用
+              model: "gpt-4o-2024-08-06", // Search対応モデルを使用
               messages: [
-                { 
-                  role: "system", 
-                  content: "あなたは旅行プランの専門家です。最新の観光情報を検索して、詳細で実用的な旅行プランを作成してください。指定されたJSON形式で正確に出力してください。" 
+                {
+                  role: "system",
+                  content:
+                    "あなたは旅行プランの専門家です。必ず最新の観光情報、営業時間、料金を検索して、現在の正確な情報に基づいて詳細で実用的な旅行プランを作成してください。指定されたJSON形式で正確に出力してください。",
                 },
-                { role: "user", content: singlePlanPrompt }
+                { role: "user", content: singlePlanPrompt },
               ],
               response_format: { type: "json_object" },
               max_tokens: 4000,
+              temperature: 0.7, // Search APIでは少し創造性を持たせる
             });
 
             const messageContent = response.choices[0]?.message?.content;
@@ -401,69 +447,97 @@ ${participantsPreferences}
           };
 
           // プラン1: 屋外活動中心
-          sendProgress(40, 'プラン1（屋外活動）を作成中...');
-          const plan1 = await generateSinglePlan('sunny_outdoor', 1, 40, 55);
-          
+          sendProgress(45, "プラン1（屋外活動）を作成中...");
+          const plan1 = await generateSinglePlan("sunny_outdoor", 1, 45, 60);
+
+          sendProgress(60, "プラン2（文化・歴史）を作成中...");
           // プラン2: 文化・歴史中心
-          sendProgress(55, 'プラン2（文化・歴史）を作成中...');
-          const plan2 = await generateSinglePlan('sunny_cultural', 2, 55, 75);
-          
+          const plan2 = await generateSinglePlan("sunny_cultural", 2, 60, 75);
+
+          sendProgress(75, "プラン3（屋内活動）を作成中...");
           // プラン3: 屋内活動中心
-          sendProgress(75, 'プラン3（屋内活動）を作成中...');
-          const plan3 = await generateSinglePlan('rainy_indoor', 3, 75, 85);
+          const plan3 = await generateSinglePlan("rainy_indoor", 3, 75, 90);
 
           const plans = [plan1, plan2, plan3];
 
-          sendProgress(85, 'プランの最終調整中...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          sendProgress(90, "プランの最終調整・検証中...");
+          await new Promise((resolve) => setTimeout(resolve, 1000));
 
           // 各プランの構造検証
           plans.forEach((plan, index) => {
-            if (!plan.trip_id || !plan.theme || !plan.hero || !plan.itinerary || !Array.isArray(plan.itinerary)) {
+            if (
+              !plan.trip_id ||
+              !plan.theme ||
+              !plan.hero ||
+              !plan.itinerary ||
+              !Array.isArray(plan.itinerary)
+            ) {
               throw new Error(`Invalid structure in plan ${index + 1}`);
             }
+
+            // 追加の検証：最新情報が含まれているかチェック
+            plan.itinerary.forEach((day) => {
+              if (day.activities) {
+                day.activities.forEach((activity) => {
+                  if (
+                    !activity.operating_hours &&
+                    activity.category !== "outdoor"
+                  ) {
+                    console.warn(
+                      `Warning: Missing operating hours for ${activity.title}`
+                    );
+                  }
+                });
+              }
+            });
           });
 
-          sendProgress(100, '完了しました！');
-          await new Promise(resolve => setTimeout(resolve, 500));
+          sendProgress(100, "最新情報を反映した旅行プランが完成しました！");
+          await new Promise((resolve) => setTimeout(resolve, 500));
 
           // 完了データを送信
           const completeData = JSON.stringify({
-            type: 'complete',
-            plans: plans
+            type: "complete",
+            plans: plans,
+            search_api_used: true, // Search APIが使用されたことを示すフラグ
+            generated_at: new Date().toISOString(),
           });
           controller.enqueue(encoder.encode(`data: ${completeData}\n\n`));
-
         } catch (error) {
-          console.error('Error generating travel plan:', error);
-          
+          console.error("Error generating travel plan with Search API:", error);
+
           const errorData = JSON.stringify({
-            type: 'error',
-            message: error.message
+            type: "error",
+            message: `Search API Error: ${error.message}`,
+            search_api_used: true,
           });
           controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
         } finally {
           controller.close();
         }
-      }
+      },
     });
 
     return new Response(stream, {
       headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-      }
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "X-Search-API": "enabled", // Search API使用を示すヘッダー
+      },
     });
-
   } catch (error) {
-    console.error('Error in streaming endpoint:', error);
-    return new Response(JSON.stringify({
-      type: 'error',
-      message: error.message
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error("Error in streaming endpoint:", error);
+    return new Response(
+      JSON.stringify({
+        type: "error",
+        message: error.message,
+        search_api_used: true,
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 }

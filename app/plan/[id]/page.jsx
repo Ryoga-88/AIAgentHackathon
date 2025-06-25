@@ -13,6 +13,47 @@ export default function PlanDetailPage() {
   
   const [showBooking, setShowBooking] = useState(false);
 
+  function getMockHotelData() {
+    const mockHotels = [
+      {
+        id: "hotel_001",
+        name: "京都グランドホテル",
+        location: "京都府京都市中京区",
+        price: "¥18,000 /泊",
+        rating: 4.6,
+        reviewCount: 1420,
+        image: "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=400&h=300&fit=crop",
+        url: "https://example.com/hotel1",
+        amenities: ["WiFi", "朝食付き", "温泉", "駐車場"]
+      },
+      {
+        id: "hotel_002", 
+        name: "祇園ビジネスホテル",
+        location: "京都府京都市東山区",
+        price: "¥9,500 /泊",
+        rating: 4.3,
+        reviewCount: 980,
+        image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&h=300&fit=crop",
+        url: "https://example.com/hotel2",
+        amenities: ["WiFi", "24時間フロント", "和室あり"]
+      },
+      {
+        id: "hotel_003",
+        name: "嵐山温泉リゾート",
+        location: "京都府京都市右京区",
+        price: "¥25,000 /泊", 
+        rating: 4.9,
+        reviewCount: 758,
+        image: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=400&h=300&fit=crop",
+        url: "https://example.com/hotel3",
+        amenities: ["WiFi", "温泉", "露天風呂", "朝食付き", "庭園"]
+      }
+    ];
+    return mockHotels;
+  }
+
+  const hotels = getMockHotelData();
+
   const handleConfirm = () => {
     router.push('/confirm');
   };
@@ -178,6 +219,67 @@ export default function PlanDetailPage() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Hotels Section */}
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">🏨 おすすめ宿泊施設</h2>
+                <div className="space-y-6">
+                  {hotels.map((hotel) => (
+                    <div key={hotel.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="sm:w-48 flex-shrink-0">
+                          <img
+                            src={hotel.image}
+                            alt={hotel.name}
+                            className="w-full h-32 sm:h-36 object-cover rounded-lg"
+                          />
+                        </div>
+                        
+                        <div className="flex-1">
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2">
+                            <div>
+                              <h3 className="text-xl font-bold text-gray-900 mb-1">{hotel.name}</h3>
+                              <p className="text-gray-600 mb-2">📍 {hotel.location}</p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-blue-600 mb-1">{hotel.price}</div>
+                              <div className="flex items-center justify-end">
+                                <span className="text-yellow-500 mr-1">⭐</span>
+                                <span className="text-gray-700 font-medium">{hotel.rating}</span>
+                                <span className="text-gray-500 text-sm ml-1">({hotel.reviewCount}件)</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {hotel.amenities.map((amenity, idx) => (
+                              <span key={idx} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+                                {amenity}
+                              </span>
+                            ))}
+                          </div>
+                          
+                          <div className="flex gap-3">
+                            <a
+                              href={hotel.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                            >
+                              詳細・予約
+                            </a>
+                            <button className="border border-gray-300 hover:border-gray-400 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors">
+                              お気に入り
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
