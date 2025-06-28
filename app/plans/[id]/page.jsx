@@ -1270,10 +1270,16 @@ export default function PlansPage({ params }) {
   };
 
   const handleConfirmPlan = () => {
+    // ホテル情報を含むプランデータを準備
+    const planDataWithHotels = {
+      ...selectedPlanData,
+      hotels: hotels[selectedPlanData.trip_id] || null
+    };
+
     if (startDate && endDate) {
       // 日程が設定されている場合、その情報を含めて確定画面に遷移
       const planWithDates = {
-        ...selectedPlanData,
+        ...planDataWithHotels,
         travel_dates: {
           startDate: startDate,
           endDate: endDate,
@@ -1289,14 +1295,18 @@ export default function PlansPage({ params }) {
         "selectedPlanWithDates",
         JSON.stringify(planWithDates)
       );
+      // confirmedPlanにも保存（confirm画面用）
+      localStorage.setItem("confirmedPlan", JSON.stringify(planWithDates));
       console.log("プラン確定（日程あり）:", planWithDates);
     } else {
       // 日程が未設定の場合は元のプランデータのみ
       localStorage.setItem(
         "selectedPlanWithDates",
-        JSON.stringify(selectedPlanData)
+        JSON.stringify(planDataWithHotels)
       );
-      console.log("プラン確定（日程なし）:", selectedPlanData);
+      // confirmedPlanにも保存（confirm画面用）
+      localStorage.setItem("confirmedPlan", JSON.stringify(planDataWithHotels));
+      console.log("プラン確定（日程なし）:", planDataWithHotels);
     }
     router.push("/confirm");
   };

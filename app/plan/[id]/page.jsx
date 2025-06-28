@@ -4,6 +4,7 @@ import { useRouter, useParams } from "next/navigation";
 import { db } from "../../../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { useAuth } from "../../../contexts/AuthContext";
+import { getMockPlans } from "../../../data/mockData";
 
 export default function PlanDetailPage() {
   const router = useRouter();
@@ -67,6 +68,9 @@ export default function PlanDetailPage() {
         router.push(`/login?redirect=${currentPath}`);
       }
     } else {
+      // プランデータをlocalStorageに保存
+      localStorage.setItem('confirmedPlan', JSON.stringify(plan));
+      
       // 認証済みの場合は確定画面に遷移
       router.push("/confirm");
     }

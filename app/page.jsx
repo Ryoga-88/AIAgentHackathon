@@ -5,14 +5,23 @@ import dynamic from "next/dynamic";
 import { useAuth } from "../contexts/AuthContext";
 import { usePlanData } from "../contexts/PlanDataContext";
 import UserProfile from "../components/Auth/UserProfile";
-import { db } from '../lib/firebase';
-import { collection, addDoc, setDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { db } from "../lib/firebase";
+import {
+  collection,
+  addDoc,
+  setDoc,
+  doc,
+  serverTimestamp,
+} from "firebase/firestore";
 
 // Dynamic import with proper error handling
-const ProgressModal = dynamic(() => import("../components/ProgressModalDynamic"), {
-  ssr: false,
-  loading: () => null
-});
+const ProgressModal = dynamic(
+  () => import("../components/ProgressModalDynamic"),
+  {
+    ssr: false,
+    loading: () => null,
+  }
+);
 
 export default function Home() {
   const router = useRouter();
@@ -24,7 +33,7 @@ export default function Home() {
     budget: "", // デフォルトを空文字列に変更
     interests: [],
     startDate: "",
-    endDate: ""
+    endDate: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -45,21 +54,21 @@ export default function Home() {
   // 季節を判定する関数
   const getSeason = (date) => {
     const month = new Date(date).getMonth() + 1; // 0ベースなので+1
-    if (month >= 3 && month <= 5) return '春';
-    if (month >= 6 && month <= 8) return '夏';
-    if (month >= 9 && month <= 11) return '秋';
-    return '冬';
+    if (month >= 3 && month <= 5) return "春";
+    if (month >= 6 && month <= 8) return "夏";
+    if (month >= 9 && month <= 11) return "秋";
+    return "冬";
   };
 
   // 季節に応じた考慮事項を取得
   const getSeasonalConsiderations = (season) => {
     const considerations = {
-      '春': '桜の開花状況、花粉症対策、気温の変化に対応した服装、春祭りやイベント',
-      '夏': '暑さ対策、日焼け対策、水分補給、夏祭り、海水浴、避暑地、冷房設備',
-      '秋': '紅葉の見頃、気温の変化、秋の味覚、収穫祭、ハイキングに適した気候',
-      '冬': '寒さ対策、雪や氷への対応、温泉、冬のイルミネーション、スキーやスノーボード、防寒具'
+      春: "桜の開花状況、花粉症対策、気温の変化に対応した服装、春祭りやイベント",
+      夏: "暑さ対策、日焼け対策、水分補給、夏祭り、海水浴、避暑地、冷房設備",
+      秋: "紅葉の見頃、気温の変化、秋の味覚、収穫祭、ハイキングに適した気候",
+      冬: "寒さ対策、雪や氷への対応、温泉、冬のイルミネーション、スキーやスノーボード、防寒具",
     };
-    return considerations[season] || '';
+    return considerations[season] || "";
   };
 
   // 日付の妥当性チェック（日程が入力されている場合のみ）
@@ -68,30 +77,30 @@ export default function Home() {
     if (!formData.startDate && !formData.endDate) {
       return null;
     }
-    
+
     // 片方だけ入力されている場合はエラー
     if (!formData.startDate || !formData.endDate) {
       return "出発日と帰着日を両方入力するか、両方とも空にしてください";
     }
-    
+
     const start = new Date(formData.startDate);
     const end = new Date(formData.endDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     if (start < today) {
       return "出発日は今日以降の日付を選択してください";
     }
-    
+
     if (end < start) {
       return "帰着日は出発日以降の日付を選択してください";
     }
-    
+
     const duration = calculateDuration(formData.startDate, formData.endDate);
     if (duration > 7) {
       return "旅行期間は7日以内で設定してください";
     }
-    
+
     return null;
   };
 
@@ -100,7 +109,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setProgress(0);
-    
+
     // 日付バリデーション
     const dateError = validateDates();
     if (dateError) {
@@ -108,7 +117,7 @@ export default function Home() {
       setLoading(false);
       return;
     }
-    
+
     try {
       // 日付をフォーマット
       const startDate = new Date(formData.startDate);
@@ -116,42 +125,52 @@ export default function Home() {
       const duration = calculateDuration(formData.startDate, formData.endDate);
       const season = getSeason(formData.startDate);
       const seasonalConsiderations = getSeasonalConsiderations(season);
-      
+
       // 推定時間は動的に計算するため初期値は設定しない
       setEstimatedTime(0);
       setShowProgress(true);
-      
+
       const formatDate = (date) => {
-        return date.toLocaleDateString('ja-JP', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
+        return date.toLocaleDateString("ja-JP", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
         });
       };
-      
+
       // フォームデータを適切な形式に変換
       const requestData = {
         destination: formData.destination,
         duration: formData.startDate && formData.endDate ? duration : null,
-        budget: formData.budget ? `¥${parseInt(formData.budget).toLocaleString()}` : null,
+        budget: formData.budget
+          ? `¥${parseInt(formData.budget).toLocaleString()}`
+          : null,
         number_of_people: `${formData.people}人`,
-        interests: formData.interests.map(id => interests.find(i => i.id === id)?.label).filter(Boolean).join(', '),
-        date: formData.startDate && formData.endDate ? `${formatDate(startDate)}から${formatDate(endDate)}` : null,
+        interests: formData.interests
+          .map((id) => interests.find((i) => i.id === id)?.label)
+          .filter(Boolean)
+          .join(", "),
+        date:
+          formData.startDate && formData.endDate
+            ? `${formatDate(startDate)}から${formatDate(endDate)}`
+            : null,
         season: formData.startDate ? season : null,
-        seasonal_considerations: formData.startDate ? seasonalConsiderations : null,
+        seasonal_considerations: formData.startDate
+          ? seasonalConsiderations
+          : null,
         startDate: formData.startDate || null,
         endDate: formData.endDate || null,
-        additional_requests: '',
-        participants: []
+        additional_requests: "",
+        participants: [],
       };
 
-      console.log('🚀 Sending request data:', requestData); // デバッグ用
+      console.log("🚀 Sending request data:", requestData); // デバッグ用
 
       // ストリーミングAPIを呼び出し
-      const response = await fetch('/api/travel-plan-stream', {
-        method: 'POST',
+      const response = await fetch("/api/travel-plan-stream", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(requestData),
       });
@@ -170,113 +189,97 @@ export default function Home() {
         if (done) break;
 
         const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        const lines = chunk.split("\n");
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
-              
-              if (data.type === 'progress') {
+
+              if (data.type === "progress") {
                 setProgress(data.progress);
-              } else if (data.type === 'complete') {
+              } else if (data.type === "complete") {
                 finalPlans = data.plans;
-              } else if (data.type === 'error') {
+              } else if (data.type === "error") {
                 throw new Error(data.message);
               }
             } catch (parseError) {
-              console.warn('Failed to parse SSE data:', parseError);
+              console.warn("Failed to parse SSE data:", parseError);
             }
           }
         }
       }
 
       if (finalPlans) {
-        console.log('🎯 プラン生成完了:', finalPlans);
-        console.log('🎯 生成されたプラン数:', finalPlans.length);
-        console.log('🎯 現在のユーザー:', currentUser);
-        
+        console.log("🎯 プラン生成完了:", finalPlans);
+        console.log("🎯 生成されたプラン数:", finalPlans.length);
+        console.log("🎯 現在のユーザー:", currentUser);
+
         // 日付情報を含めてLocalStorageに結果を保存
         const plansWithDates = {
           plans: finalPlans,
           travelDates: {
             startDate: formData.startDate,
             endDate: formData.endDate,
-            duration: duration
-          }
+            duration: duration,
+          },
         };
-        localStorage.setItem('travelPlans', JSON.stringify(plansWithDates));
-        console.log('💾 LocalStorage保存完了:', plansWithDates);
-        
+        localStorage.setItem("travelPlans", JSON.stringify(plansWithDates));
+        console.log("💾 LocalStorage保存完了:", plansWithDates);
+
         // Contextにもデータを設定（直接遷移用）
-        console.log('🎯 Context設定開始...');
-        setGeneratedPlanData(finalPlans, {
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          duration: duration
-        }, {
-          destination: formData.destination,
-          date: formData.startDate,
-          season: season,
-          seasonal_considerations: seasonalConsiderations,
-          budget: formData.budget,
-          number_of_people: formData.people,
-          interests: formData.interests,
-          additional_requests: formData.additionalRequests || '',
-          participants: formData.participants || [],
-          duration: duration
-        });
-        console.log('✅ Context設定完了');
-        
+        console.log("🎯 Context設定開始...");
+        setGeneratedPlanData(
+          finalPlans,
+          {
+            startDate: formData.startDate,
+            endDate: formData.endDate,
+            duration: duration,
+          },
+          {
+            destination: formData.destination,
+            date: formData.startDate,
+            season: season,
+            seasonal_considerations: seasonalConsiderations,
+            budget: formData.budget,
+            number_of_people: formData.people,
+            interests: formData.interests,
+            additional_requests: formData.additionalRequests || "",
+            participants: formData.participants || [],
+            duration: duration,
+          }
+        );
+        console.log("✅ Context設定完了");
+
         // Firebase保存を試行してからLocalStorageに保存
         let savedUid = currentUser?.uid;
 
-        // Firebaseにも保存（匿名認証を使用）
+        // Firebase保存（認証不要のプランIDを生成）
         let finalUid = null;
+        let planId = null; // planIdをtryブロック外で宣言
+
         try {
-          console.log('🔥 Firebase保存開始...');
-          console.log('🔥 currentUser before auth:', currentUser);
-          
-          // 現在の認証状態を詳しく確認
-          const { signInAnonymously } = await import('firebase/auth');
-          const { auth } = await import('../lib/firebase');
-          
-          console.log('🔥 Auth module loaded');
-          console.log('🔥 auth.currentUser:', auth.currentUser);
-          console.log('🔥 auth.currentUser?.uid:', auth.currentUser?.uid);
-          console.log('🔥 currentUser (context):', currentUser);
-          console.log('🔥 currentUser?.uid (context):', currentUser?.uid);
-          
-          // 認証されているユーザーを使用
-          let authUser = auth.currentUser || currentUser;
-          console.log('🔥 使用するユーザー:', authUser);
-          console.log('🔥 使用するUID:', authUser?.uid);
-          
-          if (!authUser) {
-            console.log('🔥 匿名認証を実行中...');
-            const userCredential = await signInAnonymously(auth);
-            authUser = userCredential.user;
-            console.log('🔥 匿名認証成功:', authUser);
-            console.log('🔥 匿名認証UID:', authUser.uid);
+          console.log("🔥 Firebase保存開始...");
+          console.log("🔥 currentUser before auth:", currentUser);
+
+          // 認証済みユーザーがいる場合はそのUIDを使用、なければ一意IDを生成
+          if (currentUser?.uid) {
+            finalUid = currentUser.uid;
+            console.log("🔥 認証済みユーザーのUIDを使用:", finalUid);
           } else {
-            console.log('🔥 既にログイン済み:', authUser);
+            // 認証なしの場合は一意のプランIDを生成
+            finalUid = `guest_${Date.now()}_${Math.random()
+              .toString(36)
+              .substr(2, 9)}`;
+            console.log("🔥 ゲスト用プランIDを生成:", finalUid);
           }
-          
-          // 最終的な認証ユーザーを取得
-          const finalAuthUser = auth.currentUser || authUser;
-          finalUid = finalAuthUser?.uid;
-          
-          console.log('🔥 最終認証ユーザー:', finalAuthUser);
-          console.log('🔥 最終UID:', finalUid);
-          
-          if (!finalUid) {
-            throw new Error('認証されたユーザーIDが取得できません');
-          }
-          
+
           // プラン生成ごとの一意IDを生成
-          const planId = `${finalUid}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          console.log('🔥 生成されたプランID:', planId);
-          
+          planId = `${finalUid}_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`;
+          console.log("🔥 生成されたプランID:", planId);
+
           const travelPlanData = {
             plans: finalPlans,
             user_id: finalUid,
@@ -288,88 +291,93 @@ export default function Home() {
               budget: formData.budget,
               number_of_people: formData.people,
               interests: formData.interests,
-              additional_requests: formData.additionalRequests || '',
+              additional_requests: formData.additionalRequests || "",
               participants: formData.participants || [],
-              duration: duration
+              duration: duration,
             },
             travel_dates: {
               startDate: formData.startDate,
               endDate: formData.endDate,
-              duration: duration
+              duration: duration,
             },
             created_at: serverTimestamp(),
-            updated_at: serverTimestamp()
+            updated_at: serverTimestamp(),
           };
 
-          console.log('🔥 Firebase保存データ:', travelPlanData);
-          console.log('🔥 保存先プランID:', planId);
-          
+          console.log("🔥 Firebase保存データ:", travelPlanData);
+          console.log("🔥 保存先プランID:", planId);
+
           // 一意プランIDをドキュメントIDとして使用
-          const docRef = doc(db, 'travel_plans', planId);
-          console.log('🔥 Firestore保存実行中...');
-          
+          const docRef = doc(db, "travel_plans", planId);
+          console.log("🔥 Firestore保存実行中...");
+
           // まずAPIエンドポイント経由で保存を試行
           try {
-            const saveResponse = await fetch('/api/save-travel-plan', {
-              method: 'POST',
+            const saveResponse = await fetch("/api/save-travel-plan", {
+              method: "POST",
               headers: {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
               },
               body: JSON.stringify({
                 uid: planId,
-                planData: travelPlanData
-              })
+                planData: travelPlanData,
+              }),
             });
-            
+
             const saveResult = await saveResponse.json();
-            console.log('🔥 API保存結果:', saveResult);
-            
+            console.log("🔥 API保存結果:", saveResult);
+
             if (saveResponse.ok && !saveResult.fallback) {
-              console.log('🔥 API経由で保存成功!');
+              console.log("🔥 API経由で保存成功!");
             } else {
-              throw new Error('API保存失敗、直接保存にフォールバック');
+              throw new Error("API保存失敗、直接保存にフォールバック");
             }
           } catch (apiError) {
-            console.log('🔥 API保存失敗、直接Firestore保存を試行:', apiError.message);
+            console.log(
+              "🔥 API保存失敗、直接Firestore保存を試行:",
+              apiError.message
+            );
             await setDoc(docRef, travelPlanData);
-            console.log('🔥 直接Firestore保存成功! Document ID:', planId);
+            console.log("🔥 直接Firestore保存成功! Document ID:", planId);
           }
-          
+
           // プランにFirestore IDを追加
-          finalPlans.forEach(plan => {
+          finalPlans.forEach((plan) => {
             plan.firestore_id = planId;
           });
-          console.log('🔥 プランにFirestore ID追加完了:', planId);
-          
+          console.log("🔥 プランにFirestore ID追加完了:", planId);
+
           // 成功時のプランID更新
           savedUid = planId;
         } catch (firebaseError) {
-          console.error('🔥 Firebase保存エラー:', firebaseError);
-          console.warn('🔥 Firebase保存に失敗しましたが、プラン表示は継続します');
-          
+          console.error("🔥 Firebase保存エラー:", firebaseError);
+          console.warn(
+            "🔥 Firebase保存に失敗しましたが、プラン表示は継続します"
+          );
+
           // 失敗時もplanIdがあれば使用
           if (planId) {
             savedUid = planId;
-            console.log('🔥 Firebase保存失敗、でもプランID取得:', planId);
+            console.log("🔥 Firebase保存失敗、でもプランID取得:", planId);
           }
         }
-        
+
         // LocalStorageにFirebase IDを保存
         if (savedUid) {
-          localStorage.setItem('firebaseDocId', savedUid);
-          console.log('🔥 LocalStorageにFirebase ID保存:', savedUid);
+          localStorage.setItem("firebaseDocId", savedUid);
+          console.log("🔥 LocalStorageにFirebase ID保存:", savedUid);
         } else {
-          console.error('🔥 保存できるUIDが取得できませんでした');
+          console.error("🔥 保存できるUIDが取得できませんでした");
         }
-        
+
         // 生成されたプラン詳細ページに直接遷移
-        console.log('🚀 プラン詳細ページに遷移開始...', savedUid);
+        console.log("🚀 プラン詳細ページに遷移開始...", savedUid);
         router.push(`/plans/${savedUid}`);
       } else {
-        throw new Error('プランの生成が完了しませんでした');
+        throw new Error("プランの生成が完了しませんでした");
       }
     } catch (err) {
-      console.error('❌ Error:', err); // デバッグ用
+      console.error("❌ Error:", err); // デバッグ用
       setError(`プラン生成エラー: ${err.message}`);
     } finally {
       setLoading(false);
@@ -379,31 +387,37 @@ export default function Home() {
   };
 
   const handleInterestToggle = (interest) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       interests: prev.interests.includes(interest)
-        ? prev.interests.filter(i => i !== interest)
-        : [...prev.interests, interest]
+        ? prev.interests.filter((i) => i !== interest)
+        : [...prev.interests, interest],
     }));
   };
 
   const interests = [
-    { id: 'heritage', label: '歴史・文化', icon: '🏛️' },
-    { id: 'nature', label: '自然・景色', icon: '🌸' },
-    { id: 'food', label: 'グルメ', icon: '🍜' },
-    { id: 'experience', label: '体験・アクティビティ', icon: '🎨' },
-    { id: 'shopping', label: 'ショッピング', icon: '🛍️' },
-    { id: 'relaxation', label: 'リラクゼーション', icon: '♨️' }
+    { id: "heritage", label: "歴史・文化", icon: "🏛️" },
+    { id: "nature", label: "自然・景色", icon: "🌸" },
+    { id: "food", label: "グルメ", icon: "🍜" },
+    { id: "experience", label: "体験・アクティビティ", icon: "🎨" },
+    { id: "shopping", label: "ショッピング", icon: "🛍️" },
+    { id: "relaxation", label: "リラクゼーション", icon: "♨️" },
   ];
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 ${showProgress ? 'overflow-hidden' : ''}`}>
+    <div
+      className={`min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 ${
+        showProgress ? "overflow-hidden" : ""
+      }`}
+    >
       {/* Header with User Profile */}
       <div className="relative z-10 bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
-              <h2 className="text-xl font-semibold text-gray-900">旅行 AI プランナー</h2>
+              <h2 className="text-xl font-semibold text-gray-900">
+                旅行 AI プランナー
+              </h2>
             </div>
             <UserProfile />
           </div>
@@ -411,12 +425,17 @@ export default function Home() {
       </div>
 
       {/* Hero Section */}
-      <div className={`relative overflow-hidden bg-white ${showProgress ? 'filter blur-sm' : ''}`}>
+      <div
+        className={`relative overflow-hidden bg-white ${
+          showProgress ? "filter blur-sm" : ""
+        }`}
+      >
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 opacity-90"></div>
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: "url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1600&h=900&fit=crop')"
+            backgroundImage:
+              "url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1600&h=900&fit=crop')",
           }}
         ></div>
         <div className="relative max-w-7xl mx-auto py-24 px-4 sm:py-32 sm:px-6 lg:px-8">
@@ -431,7 +450,11 @@ export default function Home() {
       </div>
 
       {/* Form Section */}
-      <div className={`max-w-4xl mx-auto py-16 px-4 sm:px-6 lg:px-8 ${showProgress ? 'filter blur-sm pointer-events-none' : ''}`}>
+      <div
+        className={`max-w-4xl mx-auto py-16 px-4 sm:px-6 lg:px-8 ${
+          showProgress ? "filter blur-sm pointer-events-none" : ""
+        }`}
+      >
         <div className="bg-white rounded-2xl shadow-xl p-8 lg:p-12">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
@@ -453,15 +476,17 @@ export default function Home() {
             {/* Destination */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                行き先
+                行き先の都道府県
               </label>
               <input
                 type="text"
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                placeholder="例: 京都、白川郷、沖縄"
+                placeholder="例: 京都、大阪、沖縄、北海道..."
                 value={formData.destination}
-                onChange={(e) => setFormData({...formData, destination: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, destination: e.target.value })
+                }
               />
             </div>
 
@@ -475,8 +500,10 @@ export default function Home() {
                   type="date"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   value={formData.startDate}
-                  onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) =>
+                    setFormData({ ...formData, startDate: e.target.value })
+                  }
+                  min={new Date().toISOString().split("T")[0]}
                 />
               </div>
               <div>
@@ -487,8 +514,12 @@ export default function Home() {
                   type="date"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   value={formData.endDate}
-                  onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                  min={formData.startDate || new Date().toISOString().split('T')[0]}
+                  onChange={(e) =>
+                    setFormData({ ...formData, endDate: e.target.value })
+                  }
+                  min={
+                    formData.startDate || new Date().toISOString().split("T")[0]
+                  }
                 />
               </div>
             </div>
@@ -501,7 +532,9 @@ export default function Home() {
               <select
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={formData.people}
-                onChange={(e) => setFormData({...formData, people: parseInt(e.target.value)})}
+                onChange={(e) =>
+                  setFormData({ ...formData, people: parseInt(e.target.value) })
+                }
               >
                 <option value={1}>1人</option>
                 <option value={2}>2人</option>
@@ -519,7 +552,9 @@ export default function Home() {
               <select
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={formData.budget}
-                onChange={(e) => setFormData({...formData, budget: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, budget: e.target.value })
+                }
               >
                 <option value="">予算を選択してください（未選択も可）</option>
                 <option value={20000}>〜¥20,000</option>
@@ -536,15 +571,15 @@ export default function Home() {
                 興味のあること（複数選択可）
               </label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {interests.map(interest => (
+                {interests.map((interest) => (
                   <button
                     key={interest.id}
                     type="button"
                     onClick={() => handleInterestToggle(interest.id)}
                     className={`p-4 rounded-lg border-2 transition-all duration-200 ${
                       formData.interests.includes(interest.id)
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-gray-200 hover:border-gray-300 text-gray-700"
                     }`}
                   >
                     <div className="text-2xl mb-1">{interest.icon}</div>
@@ -562,14 +597,19 @@ export default function Home() {
                   旅行に参加する方の個別の要望があれば教えてください
                 </p>
               </div>
-              
+
               <div>
                 <textarea
                   rows={4}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   placeholder="例:&#10;・お寿司が食べたい&#10;・温泉に入りたい&#10;・写真映えするスポットに行きたい&#10;・お土産を買いたい&#10;・のんびり過ごしたい&#10;・アクティブに動き回りたい"
-                  value={formData.additionalRequests || ''}
-                  onChange={(e) => setFormData({...formData, additionalRequests: e.target.value})}
+                  value={formData.additionalRequests || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      additionalRequests: e.target.value,
+                    })
+                  }
                 />
               </div>
             </div>
@@ -587,7 +627,7 @@ export default function Home() {
                     AIがプランを作成中...
                   </div>
                 ) : (
-                  '旅程プランを作成する'
+                  "旅程プランを作成する"
                 )}
               </button>
             </div>
@@ -596,7 +636,7 @@ export default function Home() {
       </div>
 
       {/* Progress Modal */}
-      <ProgressModal 
+      <ProgressModal
         isVisible={showProgress}
         progress={progress}
         totalPlans={3}

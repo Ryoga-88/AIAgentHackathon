@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ビルドの最適化
-  swcMinify: true,
+  // Docker用のスタンドアロンビルド
+  output: 'standalone',
   // 不要なファイルの除外
   webpack: (config, { isServer }) => {
     if (!isServer) {
