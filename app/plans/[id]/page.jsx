@@ -44,6 +44,7 @@ export default function PlansPage({ params }) {
   const [showRegenerateForm, setShowRegenerateForm] = useState(false);
   const [additionalPrompt, setAdditionalPrompt] = useState("");
   const [people, setPeople] = useState(2);
+  const [showCopySuccess, setShowCopySuccess] = useState(false);
 
   // 進捗モーダル用の状態
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -1563,6 +1564,32 @@ export default function PlansPage({ params }) {
     setShowRegenerateForm(true);
   };
 
+  // 共有リンクをコピーする機能
+  const handleCopyShareLink = async () => {
+    const currentUrl = window.location.href;
+
+    try {
+      await navigator.clipboard.writeText(currentUrl);
+      setShowCopySuccess(true);
+      setTimeout(() => setShowCopySuccess(false), 2000);
+    } catch (err) {
+      console.error("コピーに失敗しました:", err);
+      // フォールバック: テキストを選択状態にする
+      const textArea = document.createElement("textarea");
+      textArea.value = currentUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        setShowCopySuccess(true);
+        setTimeout(() => setShowCopySuccess(false), 2000);
+      } catch (fallbackError) {
+        console.error("フォールバックも失敗しました:", fallbackError);
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -2048,24 +2075,46 @@ export default function PlansPage({ params }) {
                                   )}
                                 </div>
                               ) : (
-                                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <p className="text-sm font-medium text-gray-900">
-                                        {day.accommodation}
-                                      </p>
-                                      <p className="text-xs text-gray-600 mt-1">
-                                        宿泊エリア
+                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                                  <div className="mb-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div>
+                                        <p className="text-sm font-medium text-gray-900">
+                                          {day.accommodation}
+                                        </p>
+                                        <p className="text-xs text-gray-600 mt-1">
+                                          宿泊エリア
+                                        </p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-sm text-gray-700">
+                                          予算目安: ¥8,000〜
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 旅行の豆知識 */}
+                                  <div className="bg-white rounded-lg p-3 border-l-4 border-blue-500">
+                                    <div className="flex items-center mb-2">
+                                      <span className="text-lg mr-2">💡</span>
+                                      <p className="text-sm font-semibold text-blue-900">
+                                        旅行の豆知識
                                       </p>
                                     </div>
-                                    <div className="text-right">
-                                      <p className="text-xs text-gray-500">
-                                        ホテル情報を検索中...
-                                      </p>
-                                      <p className="text-sm text-gray-700 mt-1">
-                                        予算目安: ¥8,000〜
-                                      </p>
-                                    </div>
+                                    <p className="text-sm text-gray-700 leading-relaxed">
+                                      {(() => {
+                                        const tips = [
+                                          "日本の温泉に入る前は必ずかけ湯をして体を清めましょう。心身ともにリフレッシュできます。",
+                                          "地元の郷土料理を味わうことで、その土地の文化と歴史を感じることができます。",
+                                          "神社参拝では、参道の中央は神様の通り道なので端を歩くのがマナーです。",
+                                          "旅先での出会いを大切に。地元の方との会話から新しい発見があることも。",
+                                          "季節ごとの風景を楽しみましょう。日本の四季はそれぞれ特別な美しさがあります。"
+                                        ];
+                                        const randomTip = tips[Math.floor(Math.random() * tips.length)];
+                                        return randomTip;
+                                      })()}
+                                    </p>
                                   </div>
                                 </div>
                               )}
@@ -2523,6 +2572,44 @@ export default function PlansPage({ params }) {
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  {/* プラン共有 */}
+                  <div className="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <span className="mr-2">🔗</span>
+                      プランを共有
+                    </h3>
+                    <p className="text-gray-600 mb-6">
+                      このプランを家族や友人と共有して、一緒に旅行の計画を立てましょう。
+                    </p>
+                    
+                    <div className="relative">
+                      <button
+                        onClick={handleCopyShareLink}
+                        className="w-full bg-gradient-to-r from-green-600 to-teal-700 text-white py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center"
+                      >
+                        <svg
+                          className="w-5 h-5 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
+                          />
+                        </svg>
+                        <span>共有リンクをコピー</span>
+                      </button>
+                      {showCopySuccess && (
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1 bg-green-600 text-white text-sm rounded-lg whitespace-nowrap z-50">
+                          リンクをコピーしました！
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Cost Breakdown */}

@@ -5,8 +5,7 @@ import { getMockSchedule } from "../../data/mockData";
 
 export default function ConfirmPage() {
   const router = useRouter();
-  const [exportFormat, setExportFormat] = useState('pdf');
-  const [isExporting, setIsExporting] = useState(false);
+  const [showCopySuccess, setShowCopySuccess] = useState(false);
   const [planWithDates, setPlanWithDates] = useState(null);
   const plan = getMockSchedule();
 
@@ -18,14 +17,30 @@ export default function ConfirmPage() {
     }
   }, []);
 
-  const handleExport = async () => {
-    setIsExporting(true);
-    
-    // デモ用: 2秒後にダウンロード完了
-    setTimeout(() => {
-      setIsExporting(false);
-      alert(`${exportFormat.toUpperCase()}形式でダウンロードが完了しました！`);
-    }, 2000);
+  // 共有リンクをコピーする機能
+  const handleCopyShareLink = async () => {
+    const currentUrl = window.location.href;
+
+    try {
+      await navigator.clipboard.writeText(currentUrl);
+      setShowCopySuccess(true);
+      setTimeout(() => setShowCopySuccess(false), 2000);
+    } catch (err) {
+      console.error("コピーに失敗しました:", err);
+      // フォールバック: テキストを選択状態にする
+      const textArea = document.createElement("textarea");
+      textArea.value = currentUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        setShowCopySuccess(true);
+        setTimeout(() => setShowCopySuccess(false), 2000);
+      } catch (fallbackError) {
+        console.error("フォールバックも失敗しました:", fallbackError);
+      }
+      document.body.removeChild(textArea);
+    }
   };
 
   const handleNewPlan = () => {
@@ -166,52 +181,68 @@ export default function ConfirmPage() {
           </div>
         </div>
 
-        {/* Export Section */}
+        {/* Share Section */}
         <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-6">旅程をエクスポート</h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+            <span className="mr-3">🔗</span>
+            プランを共有
+          </h3>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <button
-              onClick={() => setExportFormat('pdf')}
-              className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                exportFormat === 'pdf'
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 hover:border-gray-300 text-gray-700'
-              }`}
-            >
-              <div className="text-3xl mb-2">📄</div>
-              <div className="font-semibold">PDF形式</div>
-              <div className="text-sm opacity-75">印刷に最適な詳細版</div>
-            </button>
+          <div className="text-center mb-8">
+            <div className="text-6xl mb-4">👥</div>
+            <p className="text-gray-600 text-lg mb-6">
+              確定したプランを家族や友人と共有して、一緒に旅行の準備を進めましょう！
+            </p>
             
-            <button
-              onClick={() => setExportFormat('slides')}
-              className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                exportFormat === 'slides'
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 hover:border-gray-300 text-gray-700'
-              }`}
-            >
-              <div className="text-3xl mb-2">📊</div>
-              <div className="font-semibold">スライド形式</div>
-              <div className="text-sm opacity-75">プレゼンテーション用</div>
-            </button>
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-6">
+              <h4 className="font-semibold text-gray-900 mb-3">共有でできること</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-600">
+                <div className="flex items-center">
+                  <span className="mr-2">✅</span>
+                  詳細な旅程の確認
+                </div>
+                <div className="flex items-center">
+                  <span className="mr-2">✅</span>
+                  予算と費用の確認
+                </div>
+                <div className="flex items-center">
+                  <span className="mr-2">✅</span>
+                  地図での位置確認
+                </div>
+                <div className="flex items-center">
+                  <span className="mr-2">✅</span>
+                  活動の詳細情報
+                </div>
+              </div>
+            </div>
           </div>
 
-          <button
-            onClick={handleExport}
-            disabled={isExporting}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-4 rounded-lg font-semibold text-lg hover:shadow-lg transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            {isExporting ? (
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                エクスポート中...
+          <div className="relative">
+            <button
+              onClick={handleCopyShareLink}
+              className="w-full bg-gradient-to-r from-green-600 to-teal-700 text-white py-4 rounded-lg font-semibold text-lg hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center"
+            >
+              <svg
+                className="w-6 h-6 mr-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
+                />
+              </svg>
+              <span>共有リンクをコピー</span>
+            </button>
+            {showCopySuccess && (
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 px-4 py-2 bg-green-600 text-white text-sm rounded-lg whitespace-nowrap z-50 shadow-lg">
+                ✅ リンクをコピーしました！
               </div>
-            ) : (
-              `${exportFormat.toUpperCase()}形式でダウンロード`
             )}
-          </button>
+          </div>
         </div>
 
         {/* Booking Reminders */}

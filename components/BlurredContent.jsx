@@ -22,7 +22,7 @@ export default function BlurredContent({ children, isAuthenticated, title = "詳
       </div>
       
       {/* オーバーレイ */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/70 to-white/95 flex items-center justify-center">
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/70 to-white/95 flex items-start justify-center pt-16">
         <div className="bg-white rounded-2xl shadow-2xl p-8 mx-4 max-w-md text-center border border-gray-200 backdrop-blur-sm">
           <div className="text-5xl mb-6">🔒</div>
           <h3 className="text-2xl font-bold text-gray-900 mb-3">

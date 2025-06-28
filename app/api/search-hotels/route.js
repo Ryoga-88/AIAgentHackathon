@@ -3,12 +3,72 @@ import { NextResponse } from "next/server";
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APPLICATION_ID;
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
-// レート制限対応を強化（楽天APIの制限に準拠）
+// 旅行の豆知識データ
+const TRAVEL_TIPS = [
+  {
+    title: "日本の温泉マナー",
+    content: "温泉に入る前は必ずかけ湯をして体を清めましょう。タオルは湯船に入れず、頭の上に載せるか洗い場に置きます。",
+    emoji: "♨️"
+  },
+  {
+    title: "神社参拝の作法",
+    content: "鳥居をくぐる時は一礼し、参道の中央は神様の通り道なので端を歩きます。手水舎で手と口を清めてから参拝しましょう。",
+    emoji: "⛩️"
+  },
+  {
+    title: "お箸のマナー",
+    content: "お箸を使って食べる時は、迷い箸（どれを食べようか迷って箸を動かす）や刺し箸は避けましょう。",
+    emoji: "🥢"
+  },
+  {
+    title: "電車での過ごし方",
+    content: "日本の電車内では通話は控えめに。優先席付近では携帯電話の電源を切るか、マナーモードにしましょう。",
+    emoji: "🚃"
+  },
+  {
+    title: "チップ文化について",
+    content: "日本にはチップの習慣がありません。優れたサービスに対しては「ありがとうございます」の言葉で感謝を表現します。",
+    emoji: "💴"
+  },
+  {
+    title: "おもてなしの心",
+    content: "日本の「おもてなし」は相手を思いやる心。観光地では地元の方々の温かいもてなしを感じることができます。",
+    emoji: "🎌"
+  },
+  {
+    title: "季節の楽しみ方",
+    content: "日本は四季が美しい国。春は桜、夏は祭り、秋は紅葉、冬は雪景色。それぞれの季節に特別な魅力があります。",
+    emoji: "🌸"
+  },
+  {
+    title: "地域の特産品",
+    content: "各地域には独特の特産品があります。その土地でしか味わえない郷土料理や工芸品を探してみましょう。",
+    emoji: "🍱"
+  },
+  {
+    title: "お祭りの魅力",
+    content: "日本各地で行われる祭りは、その地域の歴史と文化が詰まった貴重な体験。地元の人と一緒に楽しみましょう。",
+    emoji: "🎊"
+  },
+  {
+    title: "自然との調和",
+    content: "日本庭園や寺院では、自然と建築が調和した美しさを感じられます。静寂の中で心を落ち着けてみてください。",
+    emoji: "🏯"
+  }
+];
+
+// ランダムな旅行の豆知識を取得
+function getRandomTravelTip() {
+  const randomIndex = Math.floor(Math.random() * TRAVEL_TIPS.length);
+  return TRAVEL_TIPS[randomIndex];
+}
+
+// 楽天API厳格なレート制限対応（1秒に1回以下を厳守）
 let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 2000; // 2秒に延長
+const MIN_REQUEST_INTERVAL = 1100; // 1.1秒に延長（安全マージン追加）
 let requestCount = 0;
 let requestTimeWindow = Date.now();
-const MAX_REQUESTS_PER_MINUTE = 30; // 1分あたり30回に制限
+const MAX_REQUESTS_PER_MINUTE = 50; // 楽天の制限（60回/分）を少し下回る設定
 
 async function waitForRateLimit() {
   const now = Date.now();
@@ -31,21 +91,22 @@ async function waitForRateLimit() {
     requestTimeWindow = Date.now();
   }
 
-  // 基本的な間隔制御
+  // 楽天API厳格な制限: 前回から1.1秒経過していなければ待機
   if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
     const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
-    console.log(`レート制限のため${waitTime}ms待機中...`);
+    console.log(`楽天API制限のため${waitTime}ms待機中... (1秒に1回制限)`);
     await new Promise((resolve) => setTimeout(resolve, waitTime));
   }
 
   requestCount++;
   lastRequestTime = Date.now();
+  console.log(`楽天API呼び出し実行: ${new Date().toISOString()}`);
 }
 
 function normalizeHotelKeyword(keyword) {
   const cleanKeyword = keyword
     .replace(/宿泊なし.*?|なし.*?最終日.*?|.*帰宅予定.*?/g, "")
-    .replace(/市内の?|地域の?|周辺の?|地元の?|近くの?/g, "")
+    .replace(/市内の?|地域の?|周辺の?|地元の?|近くの?|内の?/g, "")
     .replace(/リーズナブルな|格安の?|高級な?|安い|高い/g, "")
     .replace(/ビジネスホテル|ゲストハウス.*?、?|民宿|旅館/g, "")
     .replace(/宿泊施設|ホテル|宿/g, "")
@@ -55,8 +116,10 @@ function normalizeHotelKeyword(keyword) {
     .replace(/エリア|地区/g, "") // エリア、地区を削除
     .trim();
 
-  // 空文字や短すぎるキーワードをチェック
-  if (!cleanKeyword || cleanKeyword.length < 2) {
+  // 空文字や短すぎるキーワード、無効なキーワードをチェック
+  if (!cleanKeyword || cleanKeyword.length < 2 || 
+      cleanKeyword === 'なし' || cleanKeyword === 'の' || 
+      cleanKeyword.match(/^(の|内|周辺|近く)$/)) {
     return null;
   }
 
@@ -456,21 +519,49 @@ export async function POST(request) {
             `Location search: ${searchKeyword} -> coordinates (${location.lat}, ${location.lng})`
           );
         } else {
-          // 座標取得に失敗した場合、基本的なエリアコード（日本全体）を使用
-          searchParams.append("largeClassCode", "japan");
-          searchParams.append("keyword", searchKeyword);
-          console.log(
-            `Fallback to area search: ${searchKeyword} with japan area code`
-          );
+          // 座標取得に失敗した場合、検索キーワードが有効かチェック
+          const validKeyword = normalizeHotelKeyword(searchKeyword);
+          if (validKeyword) {
+            searchParams.append("largeClassCode", "japan");
+            searchParams.append("keyword", validKeyword);
+            console.log(
+              `Fallback to area search: ${validKeyword} with japan area code`
+            );
+          } else {
+            // 無効なキーワードの場合は旅行の豆知識を返す
+            console.log(
+              `Skipping invalid keyword: ${searchKeyword}, returning travel tip`
+            );
+            const travelTip = getRandomTravelTip();
+            return NextResponse.json({
+              hotels: [],
+              travelTip: travelTip,
+              message: "お探しの宿泊施設情報の代わりに、旅行の豆知識をお届けします！"
+            });
+          }
         }
       } catch (error) {
         console.error("Geocoding error:", error);
-        // エラーの場合も基本的なエリアコードを使用
-        searchParams.append("largeClassCode", "japan");
-        searchParams.append("keyword", searchKeyword);
-        console.log(
-          `Error fallback to area search: ${searchKeyword} with japan area code`
-        );
+        // エラーの場合も検索キーワードが有効かチェック
+        const validKeyword = normalizeHotelKeyword(searchKeyword);
+        if (validKeyword) {
+          searchParams.append("largeClassCode", "japan");
+          searchParams.append("keyword", validKeyword);
+          console.log(
+            `Error fallback to area search: ${validKeyword} with japan area code`
+          );
+        } else {
+          // 無効なキーワードの場合は旅行の豆知識を返す
+          console.log(
+            `Skipping invalid keyword after geocoding error: ${searchKeyword}, returning travel tip`
+          );
+          const travelTip = getRandomTravelTip();
+          return NextResponse.json({
+            hotels: [],
+            travelTip: travelTip,
+            message: "旅行の豆知識をお届けします！"
+          });
+        }
       }
     } else {
       return NextResponse.json(
@@ -507,10 +598,14 @@ export async function POST(request) {
       console.error(`楽天API詳細エラー [${response.status}]:`, errorDetails);
 
       if (response.status === 429) {
-        // レート制限エラーの場合、追加待機
-        console.log("レート制限エラー。追加で5秒待機します...");
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-        throw new Error("Rate limit exceeded.");
+        // レート制限エラーの場合、旅行の豆知識を返してエラーを隠す
+        console.log("レート制限エラー。旅行の豆知識を返します。");
+        const travelTip = getRandomTravelTip();
+        return NextResponse.json({
+          hotels: [],
+          travelTip: travelTip,
+          message: "旅行の豆知識をお届けします！"
+        });
       }
 
       if (response.status === 400) {
@@ -572,9 +667,14 @@ export async function POST(request) {
       "ホテル検索サービスでエラーが発生しました。しばらく時間をおいてお試しください。";
 
     if (apiError.message.includes("Rate limit")) {
-      statusCode = 429;
-      errorMessage =
-        "リクエストが頻繁すぎます。しばらく時間をおいてお試しください。";
+      // レート制限エラーの場合は旅行の豆知識を返す
+      console.log("Catch: レート制限エラー。旅行の豆知識を返します。");
+      const travelTip = getRandomTravelTip();
+      return NextResponse.json({
+        hotels: [],
+        travelTip: travelTip,
+        message: "旅行の豆知識をお届けします！"
+      });
     } else if (apiError.message.includes("Invalid request")) {
       statusCode = 400;
       errorMessage =
