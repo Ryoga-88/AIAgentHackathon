@@ -2470,6 +2470,61 @@ export default function PlansPage({ params }) {
                     </button>
                   </div>
 
+                  {/* プランカスタマイズ */}
+                  <div className="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <span className="mr-2">✨</span>
+                      プランをカスタマイズ
+                    </h3>
+                    <p className="text-gray-600 mb-6">
+                      現在のプランをベースに、あなたの追加の要望を反映した新しいプランを生成できます。
+                    </p>
+
+                    {!showRegenerateForm ? (
+                      <button
+                        onClick={() => setShowRegenerateForm(true)}
+                        className="w-full bg-gradient-to-r from-purple-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center"
+                      >
+                        <span className="mr-2">🎯</span>
+                        プランをカスタマイズする
+                      </button>
+                    ) : (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            追加の要望やリクエスト
+                          </label>
+                          <textarea
+                            value={additionalPrompt}
+                            onChange={(e) => setAdditionalPrompt(e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                            rows="4"
+                            placeholder="例: もっと自然を楽しめるスポットを追加してください、予算を抑えたい、子供向けの施設を含めてください、など"
+                          />
+                        </div>
+                        <div className="flex space-x-3">
+                          <button
+                            onClick={handleRegenerateWithPrompt}
+                            disabled={!additionalPrompt.trim()}
+                            className="flex-1 bg-purple-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+                          >
+                            <span className="mr-2">🚀</span>
+                            新しいプランを生成
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowRegenerateForm(false);
+                              setAdditionalPrompt("");
+                            }}
+                            className="flex-1 bg-gray-300 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-400 transition-colors"
+                          >
+                            キャンセル
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Cost Breakdown */}
                   {/* <CostBreakdown 
                   plan={selectedPlanData}
@@ -2477,63 +2532,6 @@ export default function PlansPage({ params }) {
                   hotels={hotels[selectedPlanData.trip_id]}
                 /> */}
                 </div>
-              </div>
-            </div>
-
-            {/* 新たなプラン生成フォーム */}
-            <div className="mt-8">
-              <div className="bg-white rounded-2xl shadow-lg p-8">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                  <span className="mr-2">✨</span>
-                  プランをカスタマイズ
-                </h3>
-                <p className="text-gray-600 mb-6">
-                  現在のプランをベースに、あなたの追加の要望を反映した新しいプランを生成できます。
-                </p>
-
-                {!showRegenerateForm ? (
-                  <button
-                    onClick={() => setShowRegenerateForm(true)}
-                    className="bg-gradient-to-r from-purple-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center"
-                  >
-                    <span className="mr-2">🎯</span>
-                    プランをカスタマイズする
-                  </button>
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        追加の要望やリクエスト
-                      </label>
-                      <textarea
-                        value={additionalPrompt}
-                        onChange={(e) => setAdditionalPrompt(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                        rows="4"
-                        placeholder="例: もっと自然を楽しめるスポットを追加してください、予算を抑えたい、子供向けの施設を含めてください、など"
-                      />
-                    </div>
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={handleRegenerateWithPrompt}
-                        disabled={!additionalPrompt.trim()}
-                        className="bg-purple-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
-                      >
-                        <span className="mr-2">🚀</span>
-                        新しいプランを生成
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowRegenerateForm(false);
-                          setAdditionalPrompt("");
-                        }}
-                        className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-400 transition-colors"
-                      >
-                        キャンセル
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </BlurredContent>
