@@ -20,6 +20,9 @@ export async function POST(request) {
     }
 
     try {
+      // レート制限を避けるため少し待機
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Booking.com API経由でホテル検索
       let searchUrl;
       let searchParams = new URLSearchParams({
@@ -48,6 +51,15 @@ export async function POST(request) {
         );
 
         if (!locationResponse.ok) {
+          console.error(`Location search failed: ${locationResponse.status} - ${locationResponse.statusText}`);
+          if (locationResponse.status === 429) {
+            console.warn('Rate limit exceeded, falling back to mock data');
+            return getMockHotelData(searchType, coordinates, location, checkin, checkout, adults);
+          }
+          if (locationResponse.status === 403) {
+            console.warn('API access forbidden, falling back to mock data');
+            return getMockHotelData(searchType, coordinates, location, checkin, checkout, adults);
+          }
           throw new Error(`Location search failed: ${locationResponse.status}`);
         }
 
@@ -76,6 +88,15 @@ export async function POST(request) {
       });
 
       if (!response.ok) {
+        console.error(`Hotel search failed: ${response.status} - ${response.statusText}`);
+        if (response.status === 429) {
+          console.warn('Rate limit exceeded for hotel search, falling back to mock data');
+          return getMockHotelData(searchType, coordinates, location, checkin, checkout, adults);
+        }
+        if (response.status === 403) {
+          console.warn('API access forbidden for hotel search, falling back to mock data');
+          return getMockHotelData(searchType, coordinates, location, checkin, checkout, adults);
+        }
         throw new Error(`Hotel search failed: ${response.status} ${response.statusText}`);
       }
 

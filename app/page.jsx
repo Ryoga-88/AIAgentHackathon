@@ -3,7 +3,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "../contexts/AuthContext";
+import { usePlanData } from "../contexts/PlanDataContext";
 import UserProfile from "../components/Auth/UserProfile";
+import { db } from '../lib/firebase';
+import { collection, addDoc, setDoc, doc, serverTimestamp } from 'firebase/firestore';
 
 // Dynamic import with proper error handling
 const ProgressModal = dynamic(() => import("../components/ProgressModalDynamic"), {
@@ -14,6 +17,7 @@ const ProgressModal = dynamic(() => import("../components/ProgressModalDynamic")
 export default function Home() {
   const router = useRouter();
   const { currentUser } = useAuth();
+  const { setGeneratedPlanData } = usePlanData();
   const [formData, setFormData] = useState({
     destination: "",
     people: 2,
@@ -188,6 +192,10 @@ export default function Home() {
       }
 
       if (finalPlans) {
+        console.log('🎯 プラン生成完了:', finalPlans);
+        console.log('🎯 生成されたプラン数:', finalPlans.length);
+        console.log('🎯 現在のユーザー:', currentUser);
+        
         // 日付情報を含めてLocalStorageに結果を保存
         const plansWithDates = {
           plans: finalPlans,
@@ -198,10 +206,165 @@ export default function Home() {
           }
         };
         localStorage.setItem('travelPlans', JSON.stringify(plansWithDates));
-        console.log('💾 Saved to localStorage with dates:', plansWithDates); // デバッグ用
+        console.log('💾 LocalStorage保存完了:', plansWithDates);
         
-        // プラン一覧ページに遷移（ログイン不要でプレビュー可能）
-        router.push('/plans');
+        // Contextにもデータを設定（直接遷移用）
+        console.log('🎯 Context設定開始...');
+        setGeneratedPlanData(finalPlans, {
+          startDate: formData.startDate,
+          endDate: formData.endDate,
+          duration: duration
+        }, {
+          destination: formData.destination,
+          date: formData.startDate,
+          season: season,
+          seasonal_considerations: seasonalConsiderations,
+          budget: formData.budget,
+          number_of_people: formData.people,
+          interests: formData.interests,
+          additional_requests: formData.additionalRequests || '',
+          participants: formData.participants || [],
+          duration: duration
+        });
+        console.log('✅ Context設定完了');
+        
+        // Firebase保存を試行してからLocalStorageに保存
+        let savedUid = currentUser?.uid;
+
+        // Firebaseにも保存（匿名認証を使用）
+        let finalUid = null;
+        try {
+          console.log('🔥 Firebase保存開始...');
+          console.log('🔥 currentUser before auth:', currentUser);
+          
+          // 現在の認証状態を詳しく確認
+          const { signInAnonymously } = await import('firebase/auth');
+          const { auth } = await import('../lib/firebase');
+          
+          console.log('🔥 Auth module loaded');
+          console.log('🔥 auth.currentUser:', auth.currentUser);
+          console.log('🔥 auth.currentUser?.uid:', auth.currentUser?.uid);
+          console.log('🔥 currentUser (context):', currentUser);
+          console.log('🔥 currentUser?.uid (context):', currentUser?.uid);
+          
+          // 認証されているユーザーを使用
+          let authUser = auth.currentUser || currentUser;
+          console.log('🔥 使用するユーザー:', authUser);
+          console.log('🔥 使用するUID:', authUser?.uid);
+          
+          if (!authUser) {
+            console.log('🔥 匿名認証を実行中...');
+            const userCredential = await signInAnonymously(auth);
+            authUser = userCredential.user;
+            console.log('🔥 匿名認証成功:', authUser);
+            console.log('🔥 匿名認証UID:', authUser.uid);
+          } else {
+            console.log('🔥 既にログイン済み:', authUser);
+          }
+          
+          // 最終的な認証ユーザーを取得
+          const finalAuthUser = auth.currentUser || authUser;
+          finalUid = finalAuthUser?.uid;
+          
+          console.log('🔥 最終認証ユーザー:', finalAuthUser);
+          console.log('🔥 最終UID:', finalUid);
+          
+          if (!finalUid) {
+            throw new Error('認証されたユーザーIDが取得できません');
+          }
+          
+          // プラン生成ごとの一意IDを生成
+          const planId = `${finalUid}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          console.log('🔥 生成されたプランID:', planId);
+          
+          const travelPlanData = {
+            plans: finalPlans,
+            user_id: finalUid,
+            request_data: {
+              destination: formData.destination,
+              date: formData.startDate,
+              season: season,
+              seasonal_considerations: seasonalConsiderations,
+              budget: formData.budget,
+              number_of_people: formData.people,
+              interests: formData.interests,
+              additional_requests: formData.additionalRequests || '',
+              participants: formData.participants || [],
+              duration: duration
+            },
+            travel_dates: {
+              startDate: formData.startDate,
+              endDate: formData.endDate,
+              duration: duration
+            },
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp()
+          };
+
+          console.log('🔥 Firebase保存データ:', travelPlanData);
+          console.log('🔥 保存先プランID:', planId);
+          
+          // 一意プランIDをドキュメントIDとして使用
+          const docRef = doc(db, 'travel_plans', planId);
+          console.log('🔥 Firestore保存実行中...');
+          
+          // まずAPIエンドポイント経由で保存を試行
+          try {
+            const saveResponse = await fetch('/api/save-travel-plan', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                uid: planId,
+                planData: travelPlanData
+              })
+            });
+            
+            const saveResult = await saveResponse.json();
+            console.log('🔥 API保存結果:', saveResult);
+            
+            if (saveResponse.ok && !saveResult.fallback) {
+              console.log('🔥 API経由で保存成功!');
+            } else {
+              throw new Error('API保存失敗、直接保存にフォールバック');
+            }
+          } catch (apiError) {
+            console.log('🔥 API保存失敗、直接Firestore保存を試行:', apiError.message);
+            await setDoc(docRef, travelPlanData);
+            console.log('🔥 直接Firestore保存成功! Document ID:', planId);
+          }
+          
+          // プランにFirestore IDを追加
+          finalPlans.forEach(plan => {
+            plan.firestore_id = planId;
+          });
+          console.log('🔥 プランにFirestore ID追加完了:', planId);
+          
+          // 成功時のプランID更新
+          savedUid = planId;
+        } catch (firebaseError) {
+          console.error('🔥 Firebase保存エラー:', firebaseError);
+          console.warn('🔥 Firebase保存に失敗しましたが、プラン表示は継続します');
+          
+          // 失敗時もplanIdがあれば使用
+          if (planId) {
+            savedUid = planId;
+            console.log('🔥 Firebase保存失敗、でもプランID取得:', planId);
+          }
+        }
+        
+        // LocalStorageにFirebase IDを保存
+        if (savedUid) {
+          localStorage.setItem('firebaseDocId', savedUid);
+          console.log('🔥 LocalStorageにFirebase ID保存:', savedUid);
+        } else {
+          console.error('🔥 保存できるUIDが取得できませんでした');
+        }
+        
+        // 生成されたプラン詳細ページに直接遷移
+        console.log('🚀 プラン詳細ページに遷移開始...', savedUid);
+        router.push(`/plans/${savedUid}`);
       } else {
         throw new Error('プランの生成が完了しませんでした');
       }

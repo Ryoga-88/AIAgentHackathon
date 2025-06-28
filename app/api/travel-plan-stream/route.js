@@ -28,7 +28,8 @@ const defaultPromptTemplate = `
 - その他の要望: {{additional_requests}}
 
 **日程・予算について:**
-- 日程が指定されていない場合は、目的地に適した一般的な旅行期間（2〜3日程度）でプランを作成してください
+- **旅行日数: {{duration}}日間** - この日数に合わせて必ずプランを作成してください
+- 日程が指定されていない場合のみ、目的地に適した一般的な旅行期間（2〜3日程度）でプランを作成してください
 - 予算が指定されていない場合は、目的地とアクティビティに適した一般的な予算設定でプランを作成してください
 
 **季節に応じた特別配慮:**
@@ -289,6 +290,7 @@ export async function POST(request) {
           // プロンプトにパラメータを埋め込む
           let filledPrompt = promptToUse
             .replace('{{destination}}', destination || '')
+            .replace('{{duration}}', duration || '適切な期間')
             .replace('{{date}}', date || '日程未指定（適切な期間を設定してください）')
             .replace('{{season}}', season || '年間を通して楽しめる')
             .replace('{{seasonal_considerations}}', seasonal_considerations || '特になし')
@@ -308,6 +310,7 @@ export async function POST(request) {
 
 **基本条件:**
 - 目的地: ${destination}
+- **旅行日数: ${duration || '適切な期間'}日間** - この日数に合わせて必ずプランを作成してください
 - 日付: ${date}
 - 季節: ${season}
 - 季節の考慮事項: ${seasonal_considerations}
@@ -365,6 +368,7 @@ ${participantsPreferences}
           "priority": "must_see/must_do/recommended等",
           "description": "詳細な説明",
           "location": "場所の名称",
+          "search_query": "Google Maps検索用クエリ（具体的な場所がある場合のみ、ない場合は空文字列）",
           "price": "料金",
           "rating": 4.5,
           "tips": "おすすめのポイント",
@@ -422,6 +426,27 @@ ${participantsPreferences}
             if (!plan.trip_id || !plan.theme || !plan.hero || !plan.itinerary || !Array.isArray(plan.itinerary)) {
               throw new Error(`Invalid structure in plan ${index + 1}`);
             }
+          });
+
+          // Firebaseに保存（クライアント側で実行するため、ここではスキップ）
+          sendProgress(90, 'プランの準備完了...');
+          
+          // プランにタイムスタンプを追加（クライアント側でFirebase保存時に使用）
+          const timestamp = new Date().toISOString();
+          plans.forEach(plan => {
+            plan.created_at = timestamp;
+            plan.request_data = {
+              destination,
+              date,
+              season,
+              seasonal_considerations,
+              budget,
+              number_of_people,
+              interests,
+              additional_requests,
+              participants,
+              duration
+            };
           });
 
           sendProgress(100, '完了しました！');

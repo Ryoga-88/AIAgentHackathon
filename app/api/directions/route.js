@@ -2,13 +2,25 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    const { waypoints } = await request.json();
-    console.log('Directions API リクエスト:', waypoints);
+    const body = await request.json();
+    const { waypoints } = body;
+    console.log('Directions API リクエスト受信:', { body, waypoints });
 
     if (!waypoints || !Array.isArray(waypoints) || waypoints.length < 2) {
-      console.error('不正なwaypoints:', waypoints);
+      console.error('不正なwaypoints:', waypoints, 'received body:', body);
       return NextResponse.json(
-        { error: 'At least 2 waypoints are required', waypoints },
+        { error: 'At least 2 waypoints are required', received_waypoints: waypoints, received_body: body },
+        { status: 400 }
+      );
+    }
+
+    // 空文字列やnull値をフィルタリング
+    const validWaypoints = waypoints.filter(wp => wp && typeof wp === 'string' && wp.trim() !== '');
+    
+    if (validWaypoints.length < 2) {
+      console.error('有効なwaypoints不足:', validWaypoints, 'original:', waypoints);
+      return NextResponse.json(
+        { error: 'At least 2 valid waypoints are required', valid_waypoints: validWaypoints, original_waypoints: waypoints },
         { status: 400 }
       );
     }
@@ -22,11 +34,11 @@ export async function POST(request) {
       );
     }
 
-    // Google Directions APIを呼び出し
-    const origin = encodeURIComponent(waypoints[0]);
-    const destination = encodeURIComponent(waypoints[waypoints.length - 1]);
-    const waypointsParam = waypoints.slice(1, -1).length > 0 
-      ? `&waypoints=${waypoints.slice(1, -1).map(w => encodeURIComponent(w)).join('|')}`
+    // Google Directions APIを呼び出し（有効なwaypointsを使用）
+    const origin = encodeURIComponent(validWaypoints[0]);
+    const destination = encodeURIComponent(validWaypoints[validWaypoints.length - 1]);
+    const waypointsParam = validWaypoints.slice(1, -1).length > 0 
+      ? `&waypoints=${validWaypoints.slice(1, -1).map(w => encodeURIComponent(w)).join('|')}`
       : '';
 
     const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}${waypointsParam}&key=${GOOGLE_MAPS_API_KEY}`;
@@ -35,14 +47,14 @@ export async function POST(request) {
     const directionsData = await directionsResponse.json();
 
     if (directionsData.status !== 'OK') {
-      console.error('Directions API エラー:', directionsData.status, directionsData.error_message, 'waypoints:', waypoints);
+      console.error('Directions API エラー:', directionsData.status, directionsData.error_message, 'valid waypoints:', validWaypoints);
       return NextResponse.json(
-        { error: 'Failed to get directions', details: directionsData.error_message, status: directionsData.status, waypoints },
+        { error: 'Failed to get directions', details: directionsData.error_message, status: directionsData.status, waypoints: validWaypoints },
         { status: 400 }
       );
     }
 
-    console.log('Directions API 成功:', waypoints);
+    console.log('Directions API 成功:', validWaypoints);
 
     // Static Map URLを生成
     const route = directionsData.routes[0];
@@ -70,7 +82,7 @@ export async function POST(request) {
     return NextResponse.json({
       static_map_url: staticMapUrl,
       route: routeInfo,
-      waypoints: waypoints
+      waypoints: validWaypoints
     });
 
   } catch (error) {
