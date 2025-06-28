@@ -20,11 +20,11 @@ export default function PlansPage({ params }) {
   const router = useRouter();
   const { currentUser, loading: authLoading } = useAuth();
   const { planData, isDirectTransition, clearPlanData } = usePlanData();
-  
+
   // Next.js 15対応: paramsを正しく解決
   const resolvedParams = use(params);
   const planId = resolvedParams?.id;
-  console.log('🎨 URLパラメータ planId:', planId);
+  console.log("🎨 URLパラメータ planId:", planId);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null);
   const [plans, setPlans] = useState([]);
@@ -48,7 +48,7 @@ export default function PlansPage({ params }) {
   // 進捗モーダル用の状態
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [regenerationProgress, setRegenerationProgress] = useState(0);
-  
+
   // 追加データ（画像・マップ等）の読み込み状態
   const [additionalDataLoading, setAdditionalDataLoading] = useState(false);
   const [additionalDataProgress, setAdditionalDataProgress] = useState(0);
@@ -60,21 +60,21 @@ export default function PlansPage({ params }) {
 
   // プランデータを取得（直接遷移またはFirestoreから）
   useEffect(() => {
-    console.log('🎨 プラン詳細ページ useEffect開始');
-    console.log('🎨 isClient:', isClient, 'authLoading:', authLoading);
-    console.log('🎨 currentUser:', currentUser);
-    console.log('🎨 isDirectTransition:', isDirectTransition);
-    console.log('🎨 planData:', planData);
-    console.log('🎨 planId:', planId);
-    console.log('🎨 loading:', loading);
-    
+    console.log("🎨 プラン詳細ページ useEffect開始");
+    console.log("🎨 isClient:", isClient, "authLoading:", authLoading);
+    console.log("🎨 currentUser:", currentUser);
+    console.log("🎨 isDirectTransition:", isDirectTransition);
+    console.log("🎨 planData:", planData);
+    console.log("🎨 planId:", planId);
+    console.log("🎨 loading:", loading);
+
     if (!isClient || authLoading) {
-      console.log('🎨 クライアント未準備または認証読み込み中のため処理を中止');
+      console.log("🎨 クライアント未準備または認証読み込み中のため処理を中止");
       return; // 認証の読み込み中は処理しない
     }
 
     if (!planId) {
-      console.log('🎨 planIDが取得できません');
+      console.log("🎨 planIDが取得できません");
       return; // planIdがない場合は処理しない
     }
 
@@ -101,32 +101,38 @@ export default function PlansPage({ params }) {
 
         // URLアクセスの場合はFirestoreから取得（ログイン・非ログイン問わず）
         console.log("URLアクセス: Firestoreからプランを取得中...", planId);
-        console.log("🎨 アクセス種別:", isLoggedIn ? "ログインユーザー" : "非ログインユーザー");
-        
+        console.log(
+          "🎨 アクセス種別:",
+          isLoggedIn ? "ログインユーザー" : "非ログインユーザー"
+        );
+
         if (!planId) {
           console.error("🎨 プランIDが取得できません");
           router.push("/");
           return;
         }
-        
+
         // まずAPIエンドポイント経由で取得を試行
         let firestorePlanData = null;
         try {
           const getResponse = await fetch(`/api/get-travel-plan?uid=${planId}`);
           const getResult = await getResponse.json();
-          console.log('🎨 API取得結果:', getResult);
-          
+          console.log("🎨 API取得結果:", getResult);
+
           if (getResponse.ok && !getResult.fallback) {
             firestorePlanData = getResult.data;
-            console.log('🎨 API経由で取得成功!');
+            console.log("🎨 API経由で取得成功!");
           } else {
-            throw new Error('API取得失敗、直接取得にフォールバック');
+            throw new Error("API取得失敗、直接取得にフォールバック");
           }
         } catch (apiError) {
-          console.log('🎨 API取得失敗、直接Firestore取得を試行:', apiError.message);
+          console.log(
+            "🎨 API取得失敗、直接Firestore取得を試行:",
+            apiError.message
+          );
           const planDocRef = doc(db, "travel_plans", planId);
           const planDocSnap = await getDoc(planDocRef);
-          
+
           if (planDocSnap.exists()) {
             firestorePlanData = planDocSnap.data();
             console.log("🎨 直接Firestore取得成功:", firestorePlanData);
@@ -137,18 +143,31 @@ export default function PlansPage({ params }) {
           console.log("🎨 取得したプランデータ:", firestorePlanData);
 
           // 新しい形式（日付情報を含む）の場合
-          if (firestorePlanData.plans && Array.isArray(firestorePlanData.plans)) {
-            console.log("🎨 新形式のプランデータ、プラン数:", firestorePlanData.plans.length);
+          if (
+            firestorePlanData.plans &&
+            Array.isArray(firestorePlanData.plans)
+          ) {
+            console.log(
+              "🎨 新形式のプランデータ、プラン数:",
+              firestorePlanData.plans.length
+            );
             setPlans(firestorePlanData.plans);
             // 日付情報が含まれている場合は状態にセット
-            if (firestorePlanData.travelDates || firestorePlanData.travel_dates) {
-              const travelDates = firestorePlanData.travelDates || firestorePlanData.travel_dates;
+            if (
+              firestorePlanData.travelDates ||
+              firestorePlanData.travel_dates
+            ) {
+              const travelDates =
+                firestorePlanData.travelDates || firestorePlanData.travel_dates;
               setStartDate(travelDates.startDate || "");
               setEndDate(travelDates.endDate || "");
             }
           } else if (Array.isArray(firestorePlanData)) {
             // 古い形式（プランのみの配列）の場合
-            console.log("🎨 古形式のプランデータ（配列）、プラン数:", firestorePlanData.length);
+            console.log(
+              "🎨 古形式のプランデータ（配列）、プラン数:",
+              firestorePlanData.length
+            );
             setPlans(firestorePlanData);
           } else {
             // 単一プランの場合は配列に変換
@@ -175,7 +194,15 @@ export default function PlansPage({ params }) {
     };
 
     fetchPlans();
-  }, [isClient, currentUser, authLoading, router, isDirectTransition, planData, planId]); // 依存配列を適切に設定
+  }, [
+    isClient,
+    currentUser,
+    authLoading,
+    router,
+    isDirectTransition,
+    planData,
+    planId,
+  ]); // 依存配列を適切に設定
 
   // 位置情報とホテル情報を取得
   useEffect(() => {
@@ -191,7 +218,7 @@ export default function PlansPage({ params }) {
         }, 1000);
         return;
       }
-      
+
       // URLアクセスの場合は通常の処理
       fetchAdditionalData();
     };
@@ -688,22 +715,22 @@ export default function PlansPage({ params }) {
           setRouteData({});
           setAdditionalDataProgress(100);
         }
-        
+
         // 追加データ取得完了
         console.log("🎨 追加データ取得完了");
         setAdditionalDataLoading(false);
         setLoading(false);
-        
+
         // 直接遷移の場合は追加データ取得完了後にContextをクリア
         if (isDirectTransition) {
-          console.log('🎯 追加データ取得完了、Contextをクリア');
+          console.log("🎯 追加データ取得完了、Contextをクリア");
           clearPlanData();
         }
       } catch (error) {
         console.error("データ取得エラー:", error);
         setAdditionalDataLoading(false);
         setLoading(false);
-        
+
         // エラー時もContextをクリア
         if (isDirectTransition) {
           clearPlanData();
@@ -1590,7 +1617,7 @@ export default function PlansPage({ params }) {
         customTitle="プランをカスタマイズ中..."
         customSubtitle="あなたの要望を反映した新しいプランを生成しています"
       />
-      
+
       {/* 追加データ読み込み中のモーダル */}
       <ProgressModalDynamic
         isVisible={additionalDataLoading}
@@ -2160,12 +2187,12 @@ export default function PlansPage({ params }) {
                                     </div>
                                   ))}
                                 </div>
-                                {dayHotels.length > 6 && (
+                                {/* {dayHotels.length > 6 && (
                                   <p className="text-sm text-gray-500 text-center mt-3">
                                     他に{dayHotels.length - 6}
                                     件のホテルがあります
                                   </p>
-                                )}
+                                )} */}
                               </div>
                             );
                           }
@@ -2184,7 +2211,7 @@ export default function PlansPage({ params }) {
                   </div>
 
                   {/* Location Information */}
-                  {locationData[selectedPlanData.hero.title] && (
+                  {/* {locationData[selectedPlanData.hero.title] && (
                     <div className="mt-8">
                       <h3 className="text-xl font-semibold text-gray-900 mb-4">
                         エリア情報
@@ -2284,7 +2311,7 @@ export default function PlansPage({ params }) {
                         </div>
                       </div>
                     </div>
-                  )}
+                  )} */}
                 </div>
               </div>
 
