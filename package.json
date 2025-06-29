@@ -9,9 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@google-cloud/vertexai": "^1.10.0",
+    "@google/generative-ai": "^0.24.1",
     "@react-pdf/renderer": "^4.3.0",
     "@vis.gl/react-google-maps": "^1.5.3",
     "firebase": "^11.9.1",
+    "firebase-admin": "^13.4.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "lucide-react": "^0.514.0",

@@ -1,6 +1,7 @@
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../contexts/AuthContext";
+import { PlanDataProvider } from "../contexts/PlanDataContext";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -24,7 +25,9 @@ export default function RootLayout({ children }) {
     <html lang="ja" className={`${inter.variable} ${playfair.variable}`}>
       <body className="font-sans antialiased">
         <AuthProvider>
-          {children}
+          <PlanDataProvider>
+            {children}
+          </PlanDataProvider>
         </AuthProvider>
       </body>
     </html>
