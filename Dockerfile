@@ -1,44 +1,26 @@
-# Next.js用のマルチステージDockerfile
-FROM node:18-alpine AS base
+# Next.js Dockerfile
+FROM node:18-alpine
 
-# 依存関係のインストール用ステージ
-FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# package.jsonとpackage-lock.jsonをコピー
+# 必要なパッケージをインストール
+RUN apk add --no-cache libc6-compat
+
+# 依存関係をコピーしてインストール
 COPY package*.json ./
 RUN npm ci
 
-# ビルド用ステージ
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# アプリケーションコードをコピー
 COPY . .
 
 # Next.jsアプリをビルド
 RUN npm run build
 
-# 本番用ステージ
-FROM base AS runner
-WORKDIR /app
-
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# ビルド成果物をコピー
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
-
+# ポート設定
 EXPOSE 3000
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV NODE_ENV=production
+ENV PORT=3000
 
-CMD ["node", "server.js"]
+# アプリケーション開始
+CMD ["npm", "start"]

@@ -11,13 +11,6 @@ export default function PlansRedirectPage() {
     router.replace('/');
   }, [router]);
 
-  // リダイレクト中のローディング表示
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">プランページに移動中...</p>
-      </div>
-    </div>
-  );
+  // 何も表示しない（即座にリダイレクト）
+  return null;
 }

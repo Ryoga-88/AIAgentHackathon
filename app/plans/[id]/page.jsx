@@ -85,6 +85,10 @@ export default function PlansPage({ params }) {
 
     const fetchPlans = async () => {
       try {
+        // 最初にプログレスモーダルを表示
+        setAdditionalDataLoading(true);
+        setAdditionalDataProgress(0);
+        
         // 直接遷移の場合はContextからデータを使用（ログインユーザーのみ）
         if (isLoggedIn && isDirectTransition && planData) {
           console.log("🎨 直接遷移: Contextからプランデータを使用", planData);
@@ -234,8 +238,6 @@ export default function PlansPage({ params }) {
         }
 
         console.log("🎨 追加データ取得開始（画像・マップ・ホテル）");
-        setAdditionalDataLoading(true);
-        setAdditionalDataProgress(0);
 
         const mockPlans = plans;
 
@@ -1270,16 +1272,10 @@ export default function PlansPage({ params }) {
   };
 
   const handleConfirmPlan = () => {
-    // ホテル情報を含むプランデータを準備
-    const planDataWithHotels = {
-      ...selectedPlanData,
-      hotels: hotels[selectedPlanData.trip_id] || null
-    };
-
     if (startDate && endDate) {
       // 日程が設定されている場合、その情報を含めて確定画面に遷移
       const planWithDates = {
-        ...planDataWithHotels,
+        ...selectedPlanData,
         travel_dates: {
           startDate: startDate,
           endDate: endDate,
@@ -1295,18 +1291,14 @@ export default function PlansPage({ params }) {
         "selectedPlanWithDates",
         JSON.stringify(planWithDates)
       );
-      // confirmedPlanにも保存（confirm画面用）
-      localStorage.setItem("confirmedPlan", JSON.stringify(planWithDates));
       console.log("プラン確定（日程あり）:", planWithDates);
     } else {
       // 日程が未設定の場合は元のプランデータのみ
       localStorage.setItem(
         "selectedPlanWithDates",
-        JSON.stringify(planDataWithHotels)
+        JSON.stringify(selectedPlanData)
       );
-      // confirmedPlanにも保存（confirm画面用）
-      localStorage.setItem("confirmedPlan", JSON.stringify(planDataWithHotels));
-      console.log("プラン確定（日程なし）:", planDataWithHotels);
+      console.log("プラン確定（日程なし）:", selectedPlanData);
     }
     router.push("/confirm");
   };
@@ -2103,7 +2095,7 @@ export default function PlansPage({ params }) {
                                       </div>
                                     </div>
                                   </div>
-                                  
+
                                   {/* 旅行の豆知識 */}
                                   <div className="bg-white rounded-lg p-3 border-l-4 border-blue-500">
                                     <div className="flex items-center mb-2">
@@ -2119,9 +2111,14 @@ export default function PlansPage({ params }) {
                                           "地元の郷土料理を味わうことで、その土地の文化と歴史を感じることができます。",
                                           "神社参拝では、参道の中央は神様の通り道なので端を歩くのがマナーです。",
                                           "旅先での出会いを大切に。地元の方との会話から新しい発見があることも。",
-                                          "季節ごとの風景を楽しみましょう。日本の四季はそれぞれ特別な美しさがあります。"
+                                          "季節ごとの風景を楽しみましょう。日本の四季はそれぞれ特別な美しさがあります。",
                                         ];
-                                        const randomTip = tips[Math.floor(Math.random() * tips.length)];
+                                        const randomTip =
+                                          tips[
+                                            Math.floor(
+                                              Math.random() * tips.length
+                                            )
+                                          ];
                                         return randomTip;
                                       })()}
                                     </p>
@@ -2555,7 +2552,9 @@ export default function PlansPage({ params }) {
                           </label>
                           <textarea
                             value={additionalPrompt}
-                            onChange={(e) => setAdditionalPrompt(e.target.value)}
+                            onChange={(e) =>
+                              setAdditionalPrompt(e.target.value)
+                            }
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
                             rows="4"
                             placeholder="例: もっと自然を楽しめるスポットを追加してください、予算を抑えたい、子供向けの施設を含めてください、など"
@@ -2593,7 +2592,7 @@ export default function PlansPage({ params }) {
                     <p className="text-gray-600 mb-6">
                       このプランを家族や友人と共有して、一緒に旅行の計画を立てましょう。
                     </p>
-                    
+
                     <div className="relative">
                       <button
                         onClick={handleCopyShareLink}

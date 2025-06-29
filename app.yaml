@@ -1,0 +1,59 @@
+runtime: nodejs18
+
+# 自動スケーリング設定
+automatic_scaling:
+  min_instances: 1
+  max_instances: 10
+  target_cpu_utilization: 0.6
+  target_throughput_utilization: 0.6
+
+# リソース設定
+resources:
+  cpu: 2
+  memory_gb: 2
+  disk_size_gb: 10
+
+# 環境変数
+env_variables:
+  NODE_ENV: production
+
+# ネットワーク設定
+network:
+  name: default
+
+# ヘルスチェック設定
+liveness_check:
+  path: "/"
+  check_interval_sec: 30
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 2
+
+readiness_check:
+  path: "/"
+  check_interval_sec: 5
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 2
+  app_start_timeout_sec: 300
+
+# セキュリティ設定
+handlers:
+  - url: /.*
+    script: auto
+    secure: always
+    redirect_http_response_code: 301
+
+# 静的ファイル配信設定（Next.js用）
+- url: /_next/static
+  static_dir: .next/static
+  secure: always
+
+- url: /favicon.ico
+  static_files: public/favicon.ico
+  upload: public/favicon.ico
+  secure: always
+
+- url: /.*
+  script: auto
+  secure: always
